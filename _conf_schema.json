@@ -61,21 +61,17 @@
                 "type": "int",
                 "description": "图像宽度",
                 "default": 512,
-                "options": [
-                    512,
-                    768,
-                    1024
-                ]
+                "min": 64,
+                "max": 1920,
+                "hint": "范围64~1920，且必须为64的倍数"
             },
             "height": {
                 "type": "int",
                 "description": "图像高度",
                 "default": 512,
-                "options": [
-                    512,
-                    768,
-                    1024
-                ]
+                "min": 64,
+                "max": 1920,
+                "hint": "范围64~1920，且必须为64的倍数"
             },
             "steps": {
                 "type": "int",
