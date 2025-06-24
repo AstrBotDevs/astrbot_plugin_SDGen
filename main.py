@@ -8,7 +8,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 
 TEMP_PATH = os.path.abspath("data/temp")
 
-@register("SDGen", "buding(AstrBot)", "Stable Diffusion图像生成器", "1.1.2")
+@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.5")
 class SDGenerator(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -363,22 +363,26 @@ class SDGenerator(Star):
             except ValueError as e:
                 # 针对API返回异常的处理
                 logger.error(f"API返回数据异常: {e}")
-                yield event.plain_result(f"❌ 图像生成失败: 参数异常，API调用失败")
+                yield event.plain_result(f"❌ 图像生成失败: 参数异常，API调用失败\n{e}")
 
             except ConnectionError as e:
                 # 网络连接错误处理
                 logger.error(f"网络连接失败: {e}")
-                yield event.plain_result("⚠️ 生成失败! 请检查网络连接和WebUI服务是否运行正常")
+                yield event.plain_result(f"⚠️ 生成失败! 请检查网络连接和WebUI服务是否运行正常\n{e}")
 
             except TimeoutError as e:
                 # 处理超时错误
                 logger.error(f"请求超时: {e}")
-                yield event.plain_result("⚠️ 请求超时，请稍后再试")
+                yield event.plain_result(f"⚠️ 请求超时，请稍后再试\n{e}")
 
             except Exception as e:
                 # 捕获所有其他异常
                 logger.error(f"生成图像时发生其他错误: {e}")
-                yield event.plain_result(f"❌ 图像生成失败: 发生其他错误，请检查日志")
+                # 过滤掉包含 http/https 的报错内容
+                err_str = str(e)
+                if "http" in err_str or "https" in err_str:
+                    err_str = "[错误详情已隐藏API地址]"
+                yield event.plain_result(f"❌ 图像生成失败: 发生其他错误\n{err_str}")
             finally:
                 self.active_tasks -= 1
 
@@ -446,16 +450,20 @@ class SDGenerator(Star):
 
             except ValueError as e:
                 logger.error(f"API返回数据异常: {e}")
-                yield event.plain_result(f"❌ 图像生成失败: 参数异常，API调用失败")
+                yield event.plain_result(f"❌ 图像生成失败: 参数异常，API调用失败\n{e}")
             except ConnectionError as e:
                 logger.error(f"网络连接失败: {e}")
-                yield event.plain_result("⚠️ 生成失败! 请检查网络连接和WebUI服务是否运行正常")
+                yield event.plain_result(f"⚠️ 生成失败! 请检查网络连接和WebUI服务是否运行正常\n{e}")
             except TimeoutError as e:
                 logger.error(f"请求超时: {e}")
-                yield event.plain_result("⚠️ 请求超时，请稍后再试")
+                yield event.plain_result(f"⚠️ 请求超时，请稍后再试\n{e}")
             except Exception as e:
                 logger.error(f"生成图像时发生其他错误: {e}")
-                yield event.plain_result(f"❌ 图像生成失败: 发生其他错误，请检查日志")
+                # 过滤掉包含 http/https 的报错内容
+                err_str = str(e)
+                if "http" in err_str or "https" in err_str:
+                    err_str = "[错误详情已隐藏API地址]"
+                yield event.plain_result(f"❌ 图像生成失败: 发生其他错误\n{err_str}")
             finally:
                 self.active_tasks -= 1
 
@@ -878,7 +886,11 @@ class SDGenerator(Star):
                 yield result
         except Exception as e:
             logger.error(f"调用 generate_image 时出错: {e}")
-            yield event.plain_result("❌ 图像生成失败，请检查日志")
+            # 过滤掉包含 http/https 的报错内容
+            err_str = str(e)
+            if "http" in err_str or "https" in err_str:
+                err_str = "[错误详情已隐藏API地址]"
+            yield event.plain_result(f"❌ 图像生成失败\n{err_str}")
 
     @filter.command("画")
     async def draw(self, event: AstrMessageEvent):
