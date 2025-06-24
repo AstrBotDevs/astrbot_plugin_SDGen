@@ -133,6 +133,7 @@ class SDGenerator(Star):
                 "请返回一条逗号分隔的 `prompt` 英文字符串，适用于 Stable Diffusion web UI，"
                 "其中应包含主体、风格、光照、色彩等方面的描述，"
                 "避免解释性文本，不需要 “prompt:” 等内容，不需要双引号包裹，如果用词并不符合 Stable Diffusion WebUI 的常见词，请将其转换为常用词"
+                "角色名称要以“角色名(作品名称)”的方式输入到绘图模型。例：“aris_(blue_archive)”"
                 "直接返回 `prompt`，不要加任何额外说明。"
                 f"{prompt_guidelines}\n"
                 "描述："
