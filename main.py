@@ -9,7 +9,7 @@ from PIL import Image as PILImage # 避免与 astrbot.api.all 中的 Image 冲�
 from astrbot.api.all import register, Context, AstrBotConfig, Star, logger, llm_tool, command_group, Image
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.core.utils.session_waiter import session_waiter, SessionController
-from astrbot.api.message_components import BaseMessageComponent, Image as MessageImage, Text as MessageText
+from astrbot.api.all import BaseMessageComponent, Image as MessageImage, Plain as MessageText
 
 from .sd_api_client import SDAPIClient
 from .sd_utils import SDUtils
@@ -171,11 +171,10 @@ class SDGenerator(Star):
         # 移除命令前缀和图片信息，只保留提示词
         prompt_str = re.sub(r"^\s*[.／/]?图生图\s*", "", raw_msg).strip()
         # 移除消息链中的图片部分，只保留文本
-        if event.message_chain:
-            # 过滤掉图片组件，只保留文本组件
+        if event.message_obj and event.message_obj.message:
             # 过滤掉图片组件，只保留文本组件
             # 确保只处理 MessageText 组件
-            text_components = [comp.text for comp in event.message_chain if isinstance(comp, MessageText)]
+            text_components = [comp.text for comp in event.message_obj.message if isinstance(comp, MessageText)]
             prompt_str = " ".join(text_components).strip()
 
         async for result in self._img2img_impl(event, image_data, prompt_str):
@@ -422,9 +421,9 @@ class SDGenerator(Star):
         raw_msg = event.message_str
         prompt_str = re.sub(r"^\s*[.／/]?i2i\s*", "", raw_msg).strip()
         # 移除消息链中的图片部分，只保留文本
-        if event.message_chain:
+        if event.message_obj and event.message_obj.message:
             # 过滤掉图片组件，只保留文本组件
-            text_components = [comp.text for comp in event.message_chain if hasattr(comp, 'text') and not isinstance(comp, MessageImage)]
+            text_components = [comp.text for comp in event.message_obj.message if hasattr(comp, 'text') and not isinstance(comp, MessageImage)]
             prompt_str = " ".join(text_components).strip()
 
         # 现在继续执行实际的图生图逻辑

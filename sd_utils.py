@@ -8,30 +8,31 @@ class SDUtils:
     def __init__(self, config: dict, context):
         self.config = config
         self.context = context
-        self.resolutions = [
-            (768, 1344), (832, 1216), (896, 1152), (1024, 1024),
-            (1024, 1536), (1152, 896), (1216, 832), (1344, 768),
-            (1536, 1024)
-        ]
-
     def _get_closest_resolution(self, original_width: int, original_height: int) -> tuple[int, int]:
         """
-        根据原始图片尺寸，从预设列表中选择最接近的分辨率。
+        根据原始图片尺寸，保持横纵比，并调整到不超过 1920x1920，且为 64 的倍数。
         """
-        if not self.resolutions:
-            return original_width, original_height
+        max_dim = 1920
+        
+        # 计算缩放比例
+        scale = 1.0
+        if original_width > max_dim or original_height > max_dim:
+            scale = min(max_dim / original_width, max_dim / original_height)
+        
+        target_width = int(original_width * scale)
+        target_height = int(original_height * scale)
+        
+        # 调整为 64 的倍数
+        target_width = (target_width // 64) * 64
+        target_height = (target_height // 64) * 64
+        
+        # 确保最小尺寸，避免出现0或过小的值
+        if target_width < 64:
+            target_width = 64
+        if target_height < 64:
+            target_height = 64
 
-        closest_res = self.resolutions[0]
-        min_diff = float('inf')
-
-        for res_width, res_height in self.resolutions:
-            # 计算与原始尺寸的差异，可以考虑面积差异或欧几里得距离
-            # 这里使用简单的绝对差之和作为距离度量
-            diff = abs(original_width - res_width) + abs(original_height - res_height)
-            if diff < min_diff:
-                min_diff = diff
-                closest_res = (res_width, res_height)
-        return closest_res
+        return target_width, target_height
 
     async def generate_payload(self, prompt: str) -> dict:
         """构建生成参数"""
