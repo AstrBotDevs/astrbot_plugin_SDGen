@@ -3,15 +3,18 @@ import asyncio
 import re
 import json
 import os
+import threading
 from astrbot.api.all import register, Context, AstrBotConfig, Star, logger, llm_tool, command_group, Image
 from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event.filter import EventMessageType
 from astrbot.core.utils.session_waiter import session_waiter, SessionController
 
 from .sd_api_client import SDAPIClient
 from .sd_utils import SDUtils
 from . import messages
+from .local_tag_utils import LocalTagManager
 
-@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.6")
+@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.7")
 class SDGenerator(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -24,6 +27,8 @@ class SDGenerator(Star):
         self.client = SDAPIClient(self.config)
         self.utils = SDUtils(self.config, self.context)
 
+        self.local_tag_mgr = LocalTagManager(os.path.join(os.path.dirname(__file__), "local_tags.json"))
+
     def _validate_config(self):
         """配置验证"""
         self.config["webui_url"] = self.config["webui_url"].strip()
@@ -35,6 +40,19 @@ class SDGenerator(Star):
             # 只有在实际修改了配置时才保存
             self.config.save_config()
 
+    # 替换关键词
+    def _replace_local_tags(self, text: str) -> str:
+        replaced = self.local_tag_mgr.replace(text)
+        if replaced != text:
+            # 只输出被替换的 tag 关键词
+            changed = []
+            for k, v in self.local_tag_mgr.tags.items():
+                if k in text:
+                    changed.append(f"{k}→{v}")
+            if changed:
+                logger.info(f"[本地tag替换] 替换了: {', '.join(changed)}")
+        return replaced
+
     @llm_tool("generate_image")
     async def generate_image(self, event: AstrMessageEvent, prompt: str):
         """Generate images using Stable Diffusion based on the given prompt.
@@ -45,6 +63,7 @@ class SDGenerator(Star):
             prompt (string): The prompt or description used for generating images.
         """
         try:
+            prompt = self._replace_local_tags(prompt)
             async for result in self._generate_image_impl(event, prompt):
                 yield result
         except Exception as e:
@@ -59,6 +78,7 @@ class SDGenerator(Star):
         """直接处理 .画 指令，规避 LLM 前置拦截，完整保留用户输入"""
         raw_msg = event.message_str
         prompt_str = raw_msg.lstrip(".／/画").strip()
+        prompt_str = self._replace_local_tags(prompt_str)
         async for result in self._generate_image_impl(event, prompt_str):
             yield result
 
@@ -166,6 +186,7 @@ class SDGenerator(Star):
         Args:
             prompt: 图像描述提示词
         """
+        prompt = self._replace_local_tags(prompt)
         async for result in self._generate_image_impl(event, prompt):
             yield result
 
@@ -686,3 +707,43 @@ class SDGenerator(Star):
             yield event.plain_result("✅ LLM_PROMPT_PREFIX 已更新")
         except Exception as e:
             yield event.plain_result(f"❌ 设置失败: {e}")
+
+    @sd.command("tag")
+    async def tag_command(self, event: AstrMessageEvent, *, content: str = ""):
+        """
+        本地关键词替换管理
+        用法：
+        /sd tag 关键词:替换内容   # 添加或更新
+        /sd tag del 关键词       # 删除
+        /sd tag                 # 查询所有
+        """
+        msg = content.strip()
+        # /sd tag del 关键词
+        if msg.startswith("del "):
+            key = msg[len("del "):].strip()
+            if key in self.local_tag_mgr.tags:
+                self.local_tag_mgr.del_tag(key)
+                yield event.plain_result(f"已删除本地tag：{key}")
+            else:
+                yield event.plain_result(f"未找到本地tag：{key}")
+            return
+        # /sd tag 关键词:替换内容
+        elif ":" in msg:
+            key, value = msg.split(":", 1)
+            key = key.strip()
+            value = value.strip()
+            if key:
+                self.local_tag_mgr.set_tag(key, value)
+                yield event.plain_result(f"已设置本地tag：{key} → {value}")
+            else:
+                yield event.plain_result("关键词不能为空")
+            return
+        # /sd tag 查询
+        elif msg == "":
+            tags = self.local_tag_mgr.get_all()
+            if not tags:
+                yield event.plain_result("暂无本地tag规则")
+            else:
+                rules = "\n".join([f"{k} → {v}" for k, v in tags.items()])
+                yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
+            return
