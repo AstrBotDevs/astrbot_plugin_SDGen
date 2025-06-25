@@ -11,7 +11,7 @@ from .sd_api_client import SDAPIClient
 from .sd_utils import SDUtils
 from . import messages
 
-@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.5")
+@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.6")
 class SDGenerator(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
