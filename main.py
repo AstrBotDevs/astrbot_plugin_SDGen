@@ -644,7 +644,7 @@ class SDGenerator(Star):
             yield event.plain_result(messages.MSG_EMBEDDING_LIST_FAIL.format(error=str(e)))
 
     @sd.command("set_llm_prompt_prefix")
-    async def set_llm_prompt_prefix(self, event: AstrMessageEvent, *, prefix: str = None):
+    async def set_llm_prompt_prefix(self, event: AstrMessageEvent):
         """
         设置或查询 LLM_PROMPT_PREFIX 内容。
         用法：
@@ -653,9 +653,17 @@ class SDGenerator(Star):
         """
         try:
             config_path = os.path.join(os.path.dirname(__file__), "config.json")
-            if prefix is None or prefix.strip() == "":
+            raw = event.message_str
+            # 兼容各种前缀写法
+            for prefix in [".sd set_llm_prompt_prefix", "/sd set_llm_prompt_prefix", "sd set_llm_prompt_prefix"]:
+                if raw.strip().lower().startswith(prefix):
+                    prefix_content = raw.strip()[len(prefix):].strip()
+                    break
+            else:
+                prefix_content = None
+
+            if not prefix_content:
                 # 查询当前
-                # 优先从 config.json 读取，否则用默认
                 if os.path.exists(config_path):
                     with open(config_path, "r", encoding="utf-8") as f:
                         config_data = json.load(f)
@@ -663,7 +671,6 @@ class SDGenerator(Star):
                         if value:
                             yield event.plain_result(f"当前 LLM_PROMPT_PREFIX：\n{value}")
                             return
-                # fallback
                 from .messages import DEFAULT_LLM_PROMPT_PREFIX
                 yield event.plain_result(f"当前 LLM_PROMPT_PREFIX：\n{DEFAULT_LLM_PROMPT_PREFIX}")
                 return
@@ -673,7 +680,7 @@ class SDGenerator(Star):
             if os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
                     config_data = json.load(f)
-            config_data["LLM_PROMPT_PREFIX"] = prefix
+            config_data["LLM_PROMPT_PREFIX"] = prefix_content
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config_data, f, ensure_ascii=False, indent=2)
             yield event.plain_result("✅ LLM_PROMPT_PREFIX 已更新")
