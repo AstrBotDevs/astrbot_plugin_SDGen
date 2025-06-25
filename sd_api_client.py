@@ -2,6 +2,7 @@ import asyncio
 import base64
 import os
 import aiohttp
+import httpx # 导入 httpx 库
 from astrbot.api.all import logger
 from . import messages
 
@@ -19,6 +20,24 @@ class SDAPIClient:
             self.session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(self.config.get("session_timeout_time", 120))
             )
+
+    async def download_image_to_base64(self, image_url: str) -> str:
+        """
+        下载图片并将其转换为 Base64 编码字符串。
+        如果下载失败，将抛出 httpx.RequestError 或其他异常。
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.config.get("session_timeout_time", 120)) as client:
+                response = await client.get(image_url)
+                response.raise_for_status() # 检查 HTTP 错误
+                image_bytes = response.content
+                return base64.b64encode(image_bytes).decode("utf-8")
+        except httpx.RequestError as e:
+            logger.error(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL_LOG}: {e}")
+            raise # 重新抛出异常，让调用者处理
+        except Exception as e:
+            logger.error(f"下载图片时发生未知错误: {e}")
+            raise # 重新抛出异常
 
     async def _fetch_webui_resource(self, resource_type: str) -> list:
         """从 WebUI API 获取指定类型的资源列表"""
@@ -109,6 +128,10 @@ class SDAPIClient:
     async def call_t2i_api(self, payload: dict) -> dict:
         """调用 Stable Diffusion 文生图 API"""
         return await self.call_sd_api("/sdapi/v1/txt2img", payload)
+
+    async def call_i2i_api(self, payload: dict) -> dict:
+        """调用 Stable Diffusion 图生图 API"""
+        return await self.call_sd_api("/sdapi/v1/img2img", payload)
 
     async def apply_image_processing(self, image_origin: str) -> str:
         """统一处理高分辨率修复与超分辨率放大"""

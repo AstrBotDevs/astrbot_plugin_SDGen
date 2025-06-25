@@ -1,179 +1,219 @@
 # astrbot_plugin_SDGen
 
 ## 介绍
-用于图片生成的AstrBot插件，使用Stable Diffusion WebUI的API进行图片生成
+用于astrbot，使用Stable Diffusion WebUI的API进行图片生成的插件。
 
 ## 安装
-- 插件商店直接安装
-- 复制 `https://github.com/zouyonghe/astrbot_plugin_SDGen` 导入
+- 插件商店直接安装。
+- 复制 `https://github.com/Maoer233/astrbot_plugin_SDGen/tree/maoer` 导入。
 
 ## 工作流
 **使用LLM生成提示词 -> 使用WebUI生成图像 -> 图像增强（可选） -> 输出图像**
 
+## 命令列表
+
+### 主要功能指令
+- `/sd gen [提示词]` 或 `.画 [提示词]`：生成图片，例如 `/sd gen 星空下的城堡`。
+- `/sd i2i [图片] [提示词]` 或 `.图生图 [图片] [提示词]`：图生图，例如 `/sd i2i [图片] 星空下的城堡`。
+- `/sd check`：检查 Stable Diffusion WebUI 的连接状态。
+- `/sd conf`：显示当前使用的所有图像生成参数，包括模型、采样器、分辨率等。
+- `/sd help`：显示本插件所有可用指令及其描述。
+
+### 高级功能指令
+- `/sd verbose`：切换详细输出模式。开启时，将输出生成步骤；关闭时，只输出图片。
+- `/sd upscale`：切换图像增强模式（用于超分辨率放大或高分修复）。
+- `/sd LLM`：切换是否使用 LLM 自动生成提示词。
+- `/sd prompt`：切换是否在生成过程显示正向提示词。
+- `/sd timeout [秒数]`：设置会话超时时间（范围：10 到 300 秒）。
+- `/sd res [高度] [宽度]`：设置图像生成的分辨率（例如：`/sd res 768 512`）。分辨率需为64的倍数，且范围为64~1920。
+- `/sd step [步数]`：设置图像生成的步数（范围：10 到 50 步）。
+- `/sd batch [数量]`：设置生成图像的批数量（范围：1 到 10 张）。
+- `/sd iter [次数]`：设置生成迭代次数（范围：1 到 5 次）。
+- `/sd set_llm_prompt_prefix [新内容]`：设置 LLM 生成提示词的前缀内容。
+- `/sd set_llm_prompt_prefix`：查询当前 LLM 生成提示词的前缀内容。
+
+### 模型与资源指令
+- `/sd model list`：列出 Stable Diffusion WebUI 当前可用的基础模型。
+- `/sd model set [索引]`：根据索引设置基础模型，索引可通过 `model list` 查询。
+- `/sd lora`：列出所有可用的 LoRA 模型。
+- `/sd embedding`：显示所有已加载的 Embedding 模型。
+
+### 采样器与上采样算法指令
+- `/sd sampler list`：列出所有可用的采样器。
+- `/sd sampler set [索引]`：根据索引配置采样器，用于调整生成效果。
+- `/sd upscaler list`：列出所有可用的上采样算法。
+- `/sd upscaler set [索引]`：根据索引设置上采样算法。
+- `/sd scheduler list`：列出所有可用的调度器。
+- `/sd scheduler set [索引]`：根据索引设置调度器。
+
 ## 配置参数说明
 
-### WebUI API地址
+以下是 `config.json` 中可配置的参数及其说明：
 
+### `webui_url`
 - **类型**: `string`
-- **描述**: WebUI API地址
+- **描述**: Stable Diffusion WebUI API 地址。
 - **默认值**: `http://127.0.0.1:7860`
-- **提示**: 需要包含 `http://` 或 `https://` 前缀
+- **提示**: 需要包含 `http://` 或 `https://` 前缀。
 
-### 控制回复的详略程度
-
+### `verbose`
 - **类型**: `bool`
-- **描述**: 控制回复的详略程度
+- **描述**: 控制回复的详略程度。
 - **默认值**: `true`
-- **提示**: 设置为 `true` 时，将输出生成步骤，否则只输出图片
+- **提示**: 设置为 `true` 时，将输出生成步骤；否则只输出图片。
 
-### 会话判定超时时间
-
+### `session_timeout_time`
 - **类型**: `int`
-- **描述**: 会话判定超时时间，单位秒（s）
+- **描述**: 会话判定超时时间，单位秒（s）。
 - **默认值**: `120`
-- **提示**: 默认为两分钟，可根据需要修改
+- **提示**: 默认为两分钟，可根据需要修改。
 
-### 启用使用LLM生成正向提示词
+### `max_concurrent_tasks`
+- **类型**: `int`
+- **描述**: 最大并发任务数。
+- **默认值**: `10`
+- **提示**: 根据显存大小进行设定，防止 OOM。
 
+### `enable_generate_prompt`
 - **类型**: `bool`
-- **描述**: 是否启用使用 LLM 自动生成正向提示词
+- **描述**: 启用使用 LLM 生成正向提示词。
 - **默认值**: `true`
-- **提示**: 设置为 `true` 时启用
+- **提示**: 设置为 `true` 时启用。
 
-### 启用高分辨率处理
-
+### `enable_upscale`
 - **类型**: `bool`
-- **描述**: 是否启用高分辨率处理
+- **描述**: 启用高分辨率处理（超分辨率放大或高分修复）。
 - **默认值**: `false`
-- **提示**: 设置为 `true` 时启用
+- **提示**: 设置为 `true` 时启用。
 
-### 启用输出正向提示词
-
+### `enable_show_positive_prompt`
 - **类型**: `bool`
-- **描述**: 启用输出正向提示词
+- **描述**: 启用输出正向提示词。
 - **默认值**: `false`
-- **提示**: 设置为 `true` 时启用
+- **提示**: 设置为 `true` 时启用。
 
-### 全局正面提示词
-
+### `positive_prompt_global`
 - **类型**: `string`
-- **描述**: 全局正面提示词，会自动附加到所有生成请求
+- **描述**: 全局正面提示词，会自动附加到所有生成请求。
 - **默认值**: `""`
 
-### 全局负面提示词
-
+### `negative_prompt_global`
 - **类型**: `string`
-- **描述**: 全局负面提示词，会自动附加到所有生成请求
+- **描述**: 全局负面提示词，会自动附加到所有生成请求。
 - **默认值**: `(worst quality, low quality:1.4), deformed, bad anatomy`
 
-### 默认生成参数
+### `default_params` (默认生成参数)
+- **类型**: `object`
+- **描述**: 文本生图（txt2img）的默认生成参数。
+    - #### `width`
+        - **类型**: `int`
+        - **描述**: 图像宽度。
+        - **默认值**: `512`
+        - **范围**: `64` 到 `1920`。
+        - **提示**: 必须为64的倍数。
+    - #### `height`
+        - **类型**: `int`
+        - **描述**: 图像高度。
+        - **默认值**: `512`
+        - **范围**: `64` 到 `1920`。
+        - **提示**: 必须为64的倍数。
+    - #### `steps`
+        - **类型**: `int`
+        - **描述**: 采样步数。
+        - **默认值**: `20`
+        - **范围**: `10` 到 `50`。
+    - #### `sampler`
+        - **类型**: `string`
+        - **描述**: 采样器。
+        - **默认值**: `""`
+        - **提示**: 默认为空，使用 `/sd sampler list` 获取，使用 `/sd sampler set <index>` 设置。
+    - #### `scheduler`
+        - **类型**: `string`
+        - **描述**: 调度器。
+        - **默认值**: `""`
+        - **提示**: 默认为空，使用 `/sd scheduler list` 获取，使用 `/sd scheduler set <index>` 设置。
+    - #### `cfg_scale`
+        - **类型**: `float`
+        - **描述**: CFG 比例。
+        - **默认值**: `7.0`
+        - **范围**: `1.0` 到 `20.0`。
+    - #### `upscaler`
+        - **类型**: `string`
+        - **描述**: 上采样算法。
+        - **默认值**: `""`
+        - **提示**: 默认为空，使用 `/sd upscaler list` 获取，使用 `/sd upscaler set <index>` 设置。
+    - #### `upscale_factor`
+        - **类型**: `float`
+        - **描述**: 图像放大倍数。
+        - **默认值**: `2.0`
+        - **范围**: `1.0` 到 `8.0`。
+        - **提示**: 例如 1.1, 1.2, 2.0 等。
+    - #### `batch_size`
+        - **类型**: `int`
+        - **描述**: 每批生成的图片数量。
+        - **默认值**: `1`
+    - #### `n_iter`
+        - **类型**: `int`
+        - **描述**: 生成迭代次数。
+        - **默认值**: `1`
 
-#### 图像宽度 (`width`)
+### `img2img_params` (图生图默认生成参数)
+- **类型**: `object`
+- **描述**: 图生图（img2img）的默认生成参数。
+    - #### `denoising_strength`
+        - **类型**: `float`
+        - **描述**: 重绘幅度。
+        - **默认值**: `0.75`
+        - **范围**: `0.0` 到 `1.0`。
+        - **提示**: 重绘幅度，范围0.0~1.0。
+    - #### `steps`
+        - **类型**: `int`
+        - **描述**: 采样步数。
+        - **默认值**: `20`
+        - **范围**: `10` 到 `50`。
+    - #### `sampler`
+        - **类型**: `string`
+        - **描述**: 采样器。
+        - **默认值**: `""`
+        - **提示**: 默认为空，使用 `/sd sampler list` 获取，使用 `/sd sampler set <index>` 设置。
+    - #### `scheduler`
+        - **类型**: `string`
+        - **描述**: 调度器。
+        - **默认值**: `""`
+        - **提示**: 默认为空，使用 `/sd scheduler list` 获取，使用 `/sd scheduler set <index>` 设置。
+    - #### `cfg_scale`
+        - **类型**: `float`
+        - **描述**: CFG 比例。
+        - **默认值**: `7.0`
+        - **范围**: `1.0` 到 `20.0`。
+    - #### `batch_size`
+        - **类型**: `int`
+        - **描述**: 每批生成的图片数量。
+        - **默认值**: `1`
+    - #### `n_iter`
+        - **类型**: `int`
+        - **描述**: 生成迭代次数。
+        - **默认值**: `1`
 
-- **类型**: `int`
-- **默认值**: `512`
-- **可选值**: `[512, 768, 1024]`
+### `enable_img2img_generate_prompt`
+- **类型**: `bool`
+- **描述**: 启用使用 LLM 生成图生图正向提示词。
+- **默认值**: `true`
+- **提示**: 设置为 `true` 时启用。
 
-#### 图像高度 (`height`)
-
-- **类型**: `int`
-- **默认值**: `512`
-- **可选值**: `[512, 768, 1024]`
-
-#### 采样步数 (`steps`)
-
-- **类型**: `int`
-- **描述**: 采样步数
-- **默认值**: `20`
-- **范围**: `10 - 50`
-
-#### 采样方法 (`sampler`)
-
+### `base_model`
 - **类型**: `string`
-- **描述**: 图像生成的采样方法
-- **默认值**: `DPM++ 2M`
-- **可选值**: `Euler a`, `Euler`, `Heun`, `DPM2`, `DPM2 a`, `DPM++ 2M`, `DPM++ 2M SDE`, `DPM++ 2M SDE Heun`,
-  `DPM++ 2S a`, `DPM++ 3M SDE`, `DDIM`, `LMS`, `PLMS`, `UniPC`
-
-#### 提示词权重 (`cfg_scale`)
-
-- **类型**: `int`
-- **描述**: CFG比例
-- **默认值**: `7`
-- **范围**: `1 - 20`
-
-#### 上采样算法 (`upscaler`)
-
-- **类型**: `string`
-- **描述**: 放大的上采样算法
-- **默认值**: `ESRGAN_4x`
-- **可选值**: `Latent`, `Latent(antialiased)`, `Latent(bicubic)`, `Latent(bicubic antialiased)`, `Latent(nearest)`,
-  `Latent(nearest-exact)`, `None`, `Lanczos`, `Nearest`, `DAT x2`, `DAT x3`, `DAT x4`, `ESRGAN_4x`, `LDSR`,
-  `R-ESRGAN 4x+`, `R-ESRGAN 4x+ Anime6B`, `ScuNET`, `SCUNET PSNR`, `SwinlR_4x`
-- **提示**: 常见算法如ESRGAN、R-ESRGAN等
-
-#### 图像放大倍数 (`upscale_factor`)
-
-- **类型**: `int`
-- **描述**: 图像放大倍数
-- **默认值**: `2`
-- **范围**: `1 - 8`
-- **提示**: 常见值为 `2`, `4` 等
-
-### 基础模型
-
-- **类型**: `string`
-- **描述**: 选择生成图像的基础模型
+- **描述**: 基础模型。
 - **默认值**: `""`
-- **提示**: 默认为空，可通过 `/sd model list` 获取可用模型
+- **提示**: 默认为空，使用 `/sd model list` 获取，使用 `/sd model set <index>` 设置。
 
-### LMM生成提示词的附加限制
-
+### `prompt_guidelines`
 - **类型**: `string`
-- **描述**: LMM生成提示词时的附加限制
+- **描述**: LLM 生成提示词时的附加限制。
 - **默认值**: `""`
-- **提示**: 例如 `任何被判断为色情的提示词都应该被替换，避免出现色情内容`
+- **提示**: 例如 `任何被判断为色情的提示词都应该被替换，避免出现色情内容`。
 
-
-### 关于Stable Diffusion WebUI的部署建议
-1. 克隆仓库
-```bash
-git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui
-cd stable-diffusion-webui
-```
-
-2. 检查python版本
-<span style="color:red">（不要直接运行webui.sh)</span>
-
-```bash
-python -V
-```
-如果python版本高于3.10，例如3.11、3.12、3.13，请使用conda（anaconda或miniconda）或者mamba创建环境（可能也可以用pyenv设置，暂未验证）
-```bash
-conda create -n webui python=3.10
-conda activate webui
-# 取消激活时使用 conda deactivate
-conda install pip
-```
-3. 安装依赖
-```bash
-pip install -r requirements.txt
-```
-4. 首次运行，会安装大量模型、依赖等，需要一段时间
-```bash
-./webui.sh
-```
-5. 安装插件（可选）
-- 汉化插件 https://github.com/hanamizuki-ai/stable-diffusion-webui-localization-zh_Hans.git 或 https://github.com/VinsonLaro/stable-diffusion-webui-chinese
-- 超分辨率插件 https://github.com/Coyote-A/ultimate-upscale-for-automatic1111
-- 提示词插件 https://github.com/Physton/sd-webui-prompt-all-in-one/tree/main
-
-6. 以API方式启动webui
-```bash
-./webui.sh --listen --port 7860 --api      # 带webui的方式启动
-#./webui.sh --listen --port 7860 --nowebui # 不带webui，仅API方式启动
-```
-# 支持
-QQ： 1259085392
-- 请尽可能自己debug，实在无法解决的问题再寻求帮助
-- 任何代码方面问题，请随时发issues
+## 注意事项
+- 模型、采样器和其他资源的索引需要使用对应 `list` 命令获取后设置！
+- 如启用自动生成提示词功能，则会使用 LLM 根据提供的信息随机生成提示词。
+- 如未启用自动生成提示词功能，若自定义的提示词包含空格，则应使用 `_` 替代提示词中的空格。
