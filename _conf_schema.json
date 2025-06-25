@@ -86,6 +86,12 @@
                 "default": "",
                 "hint": "默认为空，使用 `/sd sampler list` 获取，使用 `/sd sampler set <index>` 设置"
             },
+            "scheduler": {
+                "type": "string",
+                "description": "调度器",
+                "default": "",
+                "hint": "默认为空，使用 `/sd scheduler list` 获取，使用 `/sd scheduler set <index>` 设置"
+            },
             "cfg_scale": {
                 "type": "float",
                 "description": "CFG比例",
@@ -100,12 +106,20 @@
                 "hint": "默认为空，使用 `/sd upscaler list` 获取，使用 `/sd upscaler set <index>` 设置"
             },
             "upscale_factor": {
-                "type": "int",
+                "type": "float",
                 "description": "图像放大倍数",
-                "default": 2,
-                "min": 1,
-                "max": 8,
-                "hint": "放大倍数，通常为2、4等"
+                "default": 2.0,
+                "min": 1.0,
+                "max": 8.0,
+                "hint": "放大倍数，例如1.1, 1.2, 2.0等"
+            },
+            "denoising_strength": {
+                "type": "float",
+                "description": "重绘幅度",
+                "default": 0.7,
+                "min": 0.0,
+                "max": 1.0,
+                "hint": "重绘幅度，范围0.0~1.0"
             },
             "batch_size": {
                 "type": "int",
