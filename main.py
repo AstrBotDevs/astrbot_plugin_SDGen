@@ -796,6 +796,24 @@ class SDGenerator(Star):
             logger.error(f"{messages.MSG_ITER_SET_FAIL_LOG}: {e}")
             yield event.plain_result(messages.MSG_ITER_SET_FAIL)
 
+    @i2i.command("denoising")
+    async def set_i2i_denoising_strength(self, event: AstrMessageEvent, strength: float):
+        """
+        设置图生图重绘幅度（denoising_strength）。
+        用法：
+        /sd i2i denoising [0.0~1.0]
+        例如：/sd i2i denoising 0.7
+        """
+        try:
+            if strength < 0.0 or strength > 1.0:
+                yield event.plain_result(messages.MSG_DENOISING_STRENGTH_RANGE_ERROR)
+                return
+            self.config["img2img_params"]["denoising_strength"] = strength
+            self.config.save_config()
+            yield event.plain_result(messages.MSG_DENOISING_STRENGTH_SET_SUCCESS.format(strength=strength))
+        except Exception as e:
+            logger.error(f"{messages.MSG_DENOISING_STRENGTH_SET_FAIL_LOG}: {e}")
+            yield event.plain_result(messages.MSG_DENOISING_STRENGTH_SET_FAIL)
 
     @sd.group("model")
     def model(self):
