@@ -13,7 +13,8 @@ class LocalTagManager:
             try:
                 with open(self.path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except Exception as e:
+                print(f"[LocalTagManager] 加载本地tag失败: {e}")
                 return {}
         return {}
 
@@ -29,13 +30,15 @@ class LocalTagManager:
         return text
 
     def set_tag(self, key, value):
-        self.tags[key] = value
-        self.save()
+        with self.lock:
+            self.tags[key] = value
+            self.save()
 
     def del_tag(self, key):
-        if key in self.tags:
-            del self.tags[key]
-            self.save()
+        with self.lock:
+            if key in self.tags:
+                del self.tags[key]
+                self.save()
 
     def get_all(self):
         return self.tags.copy()

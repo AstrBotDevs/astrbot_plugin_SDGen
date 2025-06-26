@@ -51,9 +51,11 @@ class SDGenerator(Star):
             # 只有在实际修改了配置时才保存
             self.config.save_config()
 
+    # 替换关键词
     def _replace_local_tags(self, text: str) -> str:
         replaced = self.local_tag_mgr.replace(text)
         if replaced != text:
+            # 只输出被替换的 tag 关键词
             changed = []
             for k, v in self.local_tag_mgr.tags.items():
                 if k in text:
@@ -85,8 +87,19 @@ class SDGenerator(Star):
         """直接处理 .画 指令，规避 LLM 前置拦截，完整保留用户输入"""
         raw_msg = event.message_str
         prompt_str = raw_msg.lstrip(".／/画").strip()
-        prompt_str = self.local_tag_mgr.replace(prompt_str)
-        async for result in self._generate_image_impl(event, prompt_str):
+        # 记录替换前后内容
+        replaced = self.local_tag_mgr.replace(prompt_str)
+        changed = []
+        for k, v in self.local_tag_mgr.tags.items():
+            if k in prompt_str:
+                changed.append(f"{k}→{v}")
+        prompt_str = replaced
+        # 先发“在画了在画了”，如有替换则追加tag提示
+        msg = "在画了在画了"
+        if changed:
+            msg += f"，为你替换了以下tag：{', '.join(changed)}"
+        await event.send(event.plain_result(msg))
+        async for result in self._generate_image_impl(event, prompt_str, skip_verbose_msg=True):
             yield result
 
     @filter.command("图生图", alias={"i2i_draw"})
@@ -147,7 +160,7 @@ class SDGenerator(Star):
             logger.error(f"{messages.MSG_CHECK_ERROR_LOG}: {e}")
             yield event.plain_result(f"{messages.MSG_CHECK_ERROR} | 插件版本: {PLUGIN_VERSION}")
     
-    async def _generate_image_impl(self, event: AstrMessageEvent, prompt: str):
+    async def _generate_image_impl(self, event: AstrMessageEvent, prompt: str, skip_verbose_msg=False):
         """实际的图像生成逻辑，供 generate_image/draw 调用"""
         async with self.task_semaphore:
             try:
@@ -157,7 +170,7 @@ class SDGenerator(Star):
                     return
 
                 verbose = self.config["verbose"]
-                if verbose:
+                if verbose and not skip_verbose_msg:
                     yield event.plain_result(messages.MSG_GENERATING)
 
                 # 始终启用 LLM 自动生成 prompt
@@ -327,7 +340,7 @@ class SDGenerator(Star):
         Args:
             prompt: 图像描述提示词
         """
-        prompt = self.local_tag_mgr.replace(prompt)
+        prompt = self._replace_local_tags(prompt)
         async for result in self._generate_image_impl(event, prompt):
             yield result
 
@@ -1059,7 +1072,7 @@ class SDGenerator(Star):
             try:
                 index = int(sampler_index) - 1
                 if index < 0 or index >= len(samplers):
-                    yield event.plain_result(messages.MSG_INVALID_SAMPLER_INDEX)
+                    yield event.plain_result(messages.MSG_INVALID_SAMPLER)
                     return
 
                 selected_sampler = samplers[index]
@@ -1179,7 +1192,7 @@ class SDGenerator(Star):
         /sd tag del 关键词       # 删除
         /sd tag                 # 查询所有
         """
-        msg = content
+        msg = content.strip()
         # /sd tag del 关键词
         if msg.startswith("del "):
             key = msg[len("del "):].strip()
@@ -1209,6 +1222,24 @@ class SDGenerator(Star):
                 rules = "\n".join([f"{k} → {v}" for k, v in tags.items()])
                 yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
             return
+
+    @filter.command("搜索tag")
+    async def search_tag(self, event: AstrMessageEvent):
+        """模糊搜索本地tag，例：.搜索tag 岛风"""
+        raw_msg = event.message_str
+        # 去除命令前缀，支持.搜索tag/搜索tag
+        keyword = raw_msg.lstrip(".／/搜索tag").strip()
+        if not keyword:
+            yield event.plain_result("请输入要搜索的关键词，例如 .搜索tag 岛风")
+            return
+        results = []
+        for k, v in self.local_tag_mgr.tags.items():
+            if keyword in k or keyword in v:
+                results.append(f"{k} → {v}")
+        if results:
+            yield event.plain_result("搜索结果：\n" + "\n".join(results))
+        else:
+            yield event.plain_result("未找到包含该关键词的tag。")
 
     def _load_prompt_prefix(self):
         if self._prompt_prefix_cache is not None:
