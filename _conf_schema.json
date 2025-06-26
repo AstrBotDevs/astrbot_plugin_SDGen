@@ -192,5 +192,11 @@
         "description": "LMM生成提示词时的附加限制",
         "default": "",
         "hint": "屏蔽色情内容等, 例如`任何被判断为色情的提示词都应该被替换，避免出现色情内容`"
+    },
+    "img2img_prompt_prefix_new": {
+        "type": "string",
+        "description": "图生图正向提示词前缀（新版字段名，测试用）。仅用于图生图流程。若未设置，则使用 positive_prompt_global。",
+        "default": "",
+        "hint": "通过 /sd i2i prompt_prefix 设置和查询"
     }
 }
