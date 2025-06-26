@@ -14,7 +14,9 @@ from .sd_utils import SDUtils
 from . import messages
 from .local_tag_utils import LocalTagManager
 
-@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.7")
+PLUGIN_VERSION = "1.1.7"
+
+@register("SDGen", "Maoer", "SDGen_Maoer", PLUGIN_VERSION)
 class SDGenerator(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -92,13 +94,13 @@ class SDGenerator(Star):
         try:
             webui_available, status = await self.client.check_webui_available()
             if webui_available:
-                yield event.plain_result(messages.MSG_CHECK_WEBUI_NORMAL)
+                yield event.plain_result(f"{messages.MSG_CHECK_WEBUI_NORMAL} | 插件版本: {PLUGIN_VERSION}")
             else:
-                yield event.plain_result(messages.MSG_CHECK_WEBUI_FAIL)
+                yield event.plain_result(f"{messages.MSG_CHECK_WEBUI_FAIL} | 插件版本: {PLUGIN_VERSION}")
         except Exception as e:
             logger.error(f"{messages.MSG_CHECK_ERROR_LOG}: {e}")
-            yield event.plain_result(messages.MSG_CHECK_ERROR)
-
+            yield event.plain_result(f"{messages.MSG_CHECK_ERROR} | 插件版本: {PLUGIN_VERSION}")
+    
     async def _generate_image_impl(self, event: AstrMessageEvent, prompt: str):
         """实际的图像生成逻辑，供 generate_image/draw 调用"""
         async with self.task_semaphore:
@@ -717,7 +719,7 @@ class SDGenerator(Star):
         /sd tag del 关键词       # 删除
         /sd tag                 # 查询所有
         """
-        msg = content.strip()
+        msg = content
         # /sd tag del 关键词
         if msg.startswith("del "):
             key = msg[len("del "):].strip()
