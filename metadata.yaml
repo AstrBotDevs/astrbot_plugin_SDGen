@@ -1,6 +1,6 @@
 name: SDGen_Maoer
 desc: 用于astrbot，使用Stable Diffusion WebUI的API进行图片生成的插件
 help: 输入 /sd 查看关键词回复帮助。
-version: v1.1.6
+version: v1.1.7
 author: Maoer233
 repo: https://github.com/Maoer233/astrbot_plugin_SDGen/tree/maoer

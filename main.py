@@ -3,19 +3,18 @@ import asyncio
 import re
 import json
 import os
-import io
-import httpx # 导入 httpx 库
-from PIL import Image as PILImage # 避免与 astrbot.api.all 中的 Image 冲突
 from astrbot.api.all import register, Context, AstrBotConfig, Star, logger, llm_tool, command_group, Image
 from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event.filter import EventMessageType
 from astrbot.core.utils.session_waiter import session_waiter, SessionController
 from astrbot.api.all import BaseMessageComponent, Image as MessageImage, Plain as MessageText
 
 from .sd_api_client import SDAPIClient
 from .sd_utils import SDUtils
 from . import messages
+from .local_tag_utils import LocalTagManager
 
-@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.6")
+@register("SDGen", "Maoer", "SDGen_Maoer", "1.1.7")
 class SDGenerator(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -28,6 +27,8 @@ class SDGenerator(Star):
         self.client = SDAPIClient(self.config)
         self.utils = SDUtils(self.config, self.context)
 
+        self.local_tag_mgr = LocalTagManager(os.path.join(os.path.dirname(__file__), "local_tags.json"))
+
     def _validate_config(self):
         """配置验证"""
         self.config["webui_url"] = self.config["webui_url"].strip()
@@ -39,48 +40,6 @@ class SDGenerator(Star):
             # 只有在实际修改了配置时才保存
             self.config.save_config()
 
-    async def _handle_llm_tool_error(self, event: AstrMessageEvent, func, *args, **kwargs):
-        """通用 LLM 工具错误处理辅助函数"""
-        try:
-            async for result in func(event, *args, **kwargs):
-                yield result
-        except ValueError as e:
-            logger.error(f"{messages.MSG_API_RETURN_ERROR_LOG}: {e}")
-            yield event.plain_result(f"{messages.MSG_API_ERROR}\n{e}")
-        except ConnectionError as e:
-            logger.error(f"{messages.MSG_CONNECTION_FAIL_LOG}: {e}")
-            yield event.plain_result(f"{messages.MSG_CONNECTION_ERROR}\n{e}")
-        except TimeoutError as e:
-            logger.error(f"{messages.MSG_TIMEOUT_ERROR_LOG}: {e}")
-            yield event.plain_result(f"{messages.MSG_TIMEOUT_ERROR}\n{e}")
-        except Exception as e:
-            logger.error(f"{messages.MSG_OTHER_ERROR_LOG}: {e}")
-            err_str = str(e)
-            if "http" in err_str or "https" in err_str:
-                err_str = messages.MSG_ERROR_API_HIDDEN
-            yield event.plain_result(f"{messages.MSG_OTHER_ERROR}\n{err_str}")
-
-    async def _handle_llm_tool_error(self, event: AstrMessageEvent, func, *args, **kwargs):
-        """通用 LLM 工具错误处理辅助函数"""
-        try:
-            async for result in func(event, *args, **kwargs):
-                yield result
-        except ValueError as e:
-            logger.error(f"{messages.MSG_API_RETURN_ERROR_LOG}: {e}")
-            yield event.plain_result(f"{messages.MSG_API_ERROR}\n{e}")
-        except ConnectionError as e:
-            logger.error(f"{messages.MSG_CONNECTION_FAIL_LOG}: {e}")
-            yield event.plain_result(f"{messages.MSG_CONNECTION_ERROR}\n{e}")
-        except TimeoutError as e:
-            logger.error(f"{messages.MSG_TIMEOUT_ERROR_LOG}: {e}")
-            yield event.plain_result(f"{messages.MSG_TIMEOUT_ERROR}\n{e}")
-        except Exception as e:
-            logger.error(f"{messages.MSG_OTHER_ERROR_LOG}: {e}")
-            err_str = str(e)
-            if "http" in err_str or "https" in err_str:
-                err_str = messages.MSG_ERROR_API_HIDDEN
-            yield event.plain_result(f"{messages.MSG_OTHER_ERROR}\n{err_str}")
-
     @llm_tool("generate_image")
     async def generate_image(self, event: AstrMessageEvent, prompt: str):
         """Generate images using Stable Diffusion based on the given prompt.
@@ -90,39 +49,9 @@ class SDGenerator(Star):
         Args:
             prompt (string): The prompt or description used for generating images.
         """
-        async for result in self._handle_llm_tool_error(event, self._generate_image_impl, event, prompt):
-            yield result
-
-    @llm_tool("img2img")
-    async def img2img_tool(self, event: AstrMessageEvent, image_url: str, prompt: str = ""):
-        """Perform image-to-image generation using Stable Diffusion.
-        This function should be called when the user provides an image and asks to modify it,
-        generate a new image based on it, or perform operations like "图生图" (image-to-image).
-
-        Args:
-            image_url (string): The URL of the input image.
-            prompt (string, optional): The prompt or description for the new image. Defaults to "".
-        """
-        # 检查 LLM 提供的 image_url 是否为占位符，如果是，则尝试从消息中提取真实图片
-        actual_image_url = image_url
-        if image_url == "https://example.com/image.jpg" or image_url == "https://example.com/image.png": # 假设这些是 LLM 可能生成的占位符
-            if event.message_obj and event.message_obj.message:
-                for comp in event.message_obj.message:
-                    if isinstance(comp, MessageImage) and hasattr(comp, 'url') and comp.url:
-                        actual_image_url = comp.url
-                        logger.debug(f"从消息组件中提取到实际图片URL: {actual_image_url}")
-                        break
-        
-        if not actual_image_url or actual_image_url == "https://example.com/image.jpg" or actual_image_url == "https://example.com/image.png":
-            yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE_URL)
-            return
-
-        image_data = None
         try:
-            image_data = await self.client.download_image_to_base64(actual_image_url)
-        except httpx.RequestError as e:
-            yield event.plain_result(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL}: {e}")
-            return
+            async for result in self._generate_image_impl(event, prompt):
+                yield result
         except Exception as e:
             yield event.plain_result(f"下载图片时发生未知错误: {e}")
             return
@@ -139,6 +68,7 @@ class SDGenerator(Star):
         """直接处理 .画 指令，规避 LLM 前置拦截，完整保留用户输入"""
         raw_msg = event.message_str
         prompt_str = raw_msg.lstrip(".／/画").strip()
+        prompt_str = self._replace_local_tags(prompt_str)
         async for result in self._generate_image_impl(event, prompt_str):
             yield result
 
@@ -383,6 +313,7 @@ class SDGenerator(Star):
         Args:
             prompt: 图像描述提示词
         """
+        prompt = self._replace_local_tags(prompt)
         async for result in self._generate_image_impl(event, prompt):
             yield result
 
@@ -1120,3 +1051,43 @@ class SDGenerator(Star):
         except Exception as e:
             logger.error(f"设置 LLM_PROMPT_PREFIX 失败: {e}")
             yield event.plain_result(f"❌ 设置失败: {e}")
+
+    @sd.command("tag")
+    async def tag_command(self, event: AstrMessageEvent, *, content: str = ""):
+        """
+        本地关键词替换管理
+        用法：
+        /sd tag 关键词:替换内容   # 添加或更新
+        /sd tag del 关键词       # 删除
+        /sd tag                 # 查询所有
+        """
+        msg = content.strip()
+        # /sd tag del 关键词
+        if msg.startswith("del "):
+            key = msg[len("del "):].strip()
+            if key in self.local_tag_mgr.tags:
+                self.local_tag_mgr.del_tag(key)
+                yield event.plain_result(f"已删除本地tag：{key}")
+            else:
+                yield event.plain_result(f"未找到本地tag：{key}")
+            return
+        # /sd tag 关键词:替换内容
+        elif ":" in msg:
+            key, value = msg.split(":", 1)
+            key = key.strip()
+            value = value.strip()
+            if key:
+                self.local_tag_mgr.set_tag(key, value)
+                yield event.plain_result(f"已设置本地tag：{key} → {value}")
+            else:
+                yield event.plain_result("关键词不能为空")
+            return
+        # /sd tag 查询
+        elif msg == "":
+            tags = self.local_tag_mgr.get_all()
+            if not tags:
+                yield event.plain_result("暂无本地tag规则")
+            else:
+                rules = "\n".join([f"{k} → {v}" for k, v in tags.items()])
+                yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
+            return
