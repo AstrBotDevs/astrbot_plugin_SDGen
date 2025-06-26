@@ -10,27 +10,49 @@ class SDUtils:
         self.context = context
     def _get_closest_resolution(self, original_width: int, original_height: int) -> tuple[int, int]:
         """
-        根据原始图片尺寸，保持横纵比，并调整到不超过 1920x1920，且为 64 的倍数。
+        根据原始图片尺寸，保持横纵比，并调整到不超过 1920x1920，且为 64 的倍数，且尽可能大。
         """
         max_dim = 1920
-        
-        # 计算缩放比例
-        scale = 1.0
-        if original_width > max_dim or original_height > max_dim:
-            scale = min(max_dim / original_width, max_dim / original_height)
-        
-        target_width = int(original_width * scale)
-        target_height = int(original_height * scale)
-        
-        # 调整为 64 的倍数
-        target_width = (target_width // 64) * 64
-        target_height = (target_height // 64) * 64
-        
-        # 确保最小尺寸，避免出现0或过小的值
-        if target_width < 64:
-            target_width = 64
-        if target_height < 64:
-            target_height = 64
+        min_dim = 64 # Minimum dimension
+
+        # Calculate aspect ratio
+        if original_height == 0: # Avoid division by zero
+            aspect_ratio = 1.0
+        else:
+            aspect_ratio = original_width / original_height
+
+        # Determine initial target dimensions based on max_dim and aspect ratio
+        if original_width >= original_height:
+            # Landscape or square
+            target_width = max_dim
+            target_height = int(max_dim / aspect_ratio)
+        else:
+            # Portrait
+            target_height = max_dim
+            target_width = int(max_dim * aspect_ratio)
+
+        # Adjust to be multiples of 64
+        # Use round to get closer to the desired max_dim, then ensure it's a multiple of 64
+        target_width = (round(target_width / 64)) * 64
+        target_height = (round(target_height / 64)) * 64
+
+        # Ensure minimum size of 64x64
+        target_width = max(target_width, min_dim)
+        target_height = max(target_height, min_dim)
+
+        # Final check: if after rounding, dimensions exceed max_dim, scale down proportionally
+        if target_width > max_dim or target_height > max_dim:
+            scale_down_factor = min(max_dim / target_width, max_dim / target_height)
+            target_width = int(target_width * scale_down_factor)
+            target_height = int(target_height * scale_down_factor)
+            
+            # Re-adjust to be multiples of 64 after scaling down
+            target_width = (round(target_width / 64)) * 64
+            target_height = (round(target_height / 64)) * 64
+            
+            # Ensure minimum size again after potential further reduction
+            target_width = max(target_width, min_dim)
+            target_height = max(target_height, min_dim)
 
         return target_width, target_height
 
