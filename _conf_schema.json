@@ -113,13 +113,55 @@
                 "max": 8.0,
                 "hint": "放大倍数，例如1.1, 1.2, 2.0等"
             },
+            "batch_size": {
+                "type": "int",
+                "description": "每批数量",
+                "default": 1
+            },
+            "n_iter": {
+                "type": "int",
+                "description": "迭代次数",
+                "default": 1
+            }
+        }
+    },
+    "img2img_params": {
+        "type": "object",
+        "description": "图生图默认生成参数",
+        "items": {
             "denoising_strength": {
                 "type": "float",
                 "description": "重绘幅度",
-                "default": 0.7,
+                "default": 0.75,
                 "min": 0.0,
                 "max": 1.0,
                 "hint": "重绘幅度，范围0.0~1.0"
+            },
+            "steps": {
+                "type": "int",
+                "description": "步数",
+                "default": 20,
+                "min": 10,
+                "max": 50
+            },
+            "sampler": {
+                "type": "string",
+                "description": "采样器",
+                "default": "",
+                "hint": "默认为空，使用 `/sd sampler list` 获取，使用 `/sd sampler set <index>` 设置"
+            },
+            "scheduler": {
+                "type": "string",
+                "description": "调度器",
+                "default": "",
+                "hint": "默认为空，使用 `/sd scheduler list` 获取，使用 `/sd scheduler set <index>` 设置"
+            },
+            "cfg_scale": {
+                "type": "float",
+                "description": "CFG比例",
+                "default": 7.0,
+                "min": 1.0,
+                "max": 20.0
             },
             "batch_size": {
                 "type": "int",
@@ -132,6 +174,12 @@
                 "default": 1
             }
         }
+    },
+    "enable_img2img_generate_prompt": {
+        "type": "bool",
+        "description": "启用使用LLM生成图生图正向提示词",
+        "default": true,
+        "hint": "设置为true时启用"
     },
     "base_model": {
         "type": "string",
