@@ -71,43 +71,6 @@ class SDGenerator(Star):
         async for result in self._generate_image_impl(event, prompt_str):
             yield result
 
-    @filter.command("图生图", alias={"i2i_draw"})
-    async def img2img_draw(self, event: AstrMessageEvent):
-        """直接处理 .图生图 指令，规避 LLM 前置拦截，完整保留用户输入"""
-        image_data = None
-        if event.message_obj and event.message_obj.message:
-            for comp in event.message_obj.message:
-                if isinstance(comp, MessageImage) and hasattr(comp, 'url') and comp.url:
-                    try:
-                        image_data = await self.client.download_image_to_base64(comp.url)
-                        break
-                    except httpx.RequestError as e:
-                        yield event.plain_result(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL}: {e}")
-                        return
-                    except Exception as e:
-                        yield event.plain_result(f"下载图片时发生未知错误: {e}")
-                        return
-                else:
-                    logger.warning("MessageImage 组件没有 url 属性或 url 为空")
-                    yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE_URL)
-                    return
-        
-        if not image_data:
-            yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE)
-            return
-
-        raw_msg = event.message_str
-        # 移除命令前缀和图片信息，只保留提示词
-        prompt_str = re.sub(r"^\s*[.／/]?图生图\s*", "", raw_msg).strip()
-        # 移除消息链中的图片部分，只保留文本
-        if event.message_obj and event.message_obj.message:
-            # 过滤掉图片组件，只保留文本组件
-            # 确保只处理 MessageText 组件
-            text_components = [comp.text for comp in event.message_obj.message if isinstance(comp, MessageText)]
-            prompt_str = " ".join(text_components).strip()
-
-        async for result in self._img2img_impl(event, image_data, prompt_str):
-            yield result
 
     @command_group("sd")
     def sd(self):
