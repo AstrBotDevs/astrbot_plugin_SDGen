@@ -68,7 +68,7 @@ class SDGenerator(Star):
         """直接处理 .画 指令，规避 LLM 前置拦截，完整保留用户输入"""
         raw_msg = event.message_str
         prompt_str = raw_msg.lstrip(".／/画").strip()
-        prompt_str = self._replace_local_tags(prompt_str)
+        prompt_str = self.local_tag_mgr.replace(prompt_str)
         async for result in self._generate_image_impl(event, prompt_str):
             yield result
 
@@ -313,7 +313,7 @@ class SDGenerator(Star):
         Args:
             prompt: 图像描述提示词
         """
-        prompt = self._replace_local_tags(prompt)
+        prompt = self.local_tag_mgr.replace(prompt)
         async for result in self._generate_image_impl(event, prompt):
             yield result
 
