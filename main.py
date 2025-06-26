@@ -5,19 +5,19 @@ import json
 import os
 import httpx
 import io
+from pathlib import Path # 导入 Path
 from PIL import Image as PILImage
-from astrbot.api.all import register, Context, AstrBotConfig, Star, logger, llm_tool, command_group, Image
+from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.event.filter import EventMessageType
 from astrbot.core.utils.session_waiter import session_waiter, SessionController
-from astrbot.api.all import BaseMessageComponent, Image as MessageImage, Plain as MessageText
+from astrbot.api.all import AstrBotConfig, logger, llm_tool, command_group, Image, BaseMessageComponent, Image as MessageImage, Plain as MessageText
 
 from .sd_api_client import SDAPIClient
 from .sd_utils import SDUtils
+from .messages import MSG_DEFAULT_LLM_PROMPT_PREFIX # 导入 MSG_DEFAULT_LLM_PROMPT_PREFIX
 from . import messages
 from .local_tag_utils import LocalTagManager
-import io
-from PIL import Image as PILImage
 
 PLUGIN_VERSION = "1.1.8"
 
@@ -34,11 +34,19 @@ class SDGenerator(Star):
         self.client = SDAPIClient(self.config)
         self.utils = SDUtils(self.config, self.context)
 
-        self.local_tag_mgr = LocalTagManager(os.path.join(os.path.dirname(__file__), "local_tags.json"))
+        # 获取插件数据目录并创建
+        self.data_dir = StarTools.get_data_dir("SDGen")
+        self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        # 新增：prompt_prefix.json 路径
-        self.prompt_prefix_path = os.path.join(os.path.dirname(__file__), "prompt_prefix.json")
+        self.local_tag_mgr = LocalTagManager(str(self.data_dir / "local_tags.json"))
+
+        # 更新：prompt_prefix.json 路径
+        self.prompt_prefix_path = self.data_dir / "prompt_prefix.json"
         self._prompt_prefix_cache = None
+
+    async def terminate(self):
+        """插件卸载/停用时调用，用于清理资源"""
+        await self.client.close()
 
     def _validate_config(self):
         """配置验证"""
@@ -170,176 +178,123 @@ class SDGenerator(Star):
     async def _generate_image_impl(self, event: AstrMessageEvent, prompt: str, skip_verbose_msg=False):
         """实际的图像生成逻辑，供 generate_image/draw 调用"""
         async with self.task_semaphore:
-            try:
-                # 检查webui可用性
-                if not (await self.client.check_webui_available())[0]:
-                    yield event.plain_result(messages.MSG_WEBUI_UNAVAILABLE)
-                    return
+            # 检查webui可用性
+            if not (await self.client.check_webui_available())[0]:
+                yield event.plain_result(messages.MSG_WEBUI_UNAVAILABLE)
+                return
 
-                verbose = self.config["verbose"]
-                if verbose and not skip_verbose_msg:
-                    yield event.plain_result(messages.MSG_GENERATING)
+            verbose = self.config["verbose"]
+            if verbose and not skip_verbose_msg:
+                yield event.plain_result(messages.MSG_GENERATING)
 
-                # 始终启用 LLM 自动生成 prompt
-                generated_prompt = await self.utils.generate_prompt_with_llm(prompt)
-                logger.debug(f"LLM generated prompt: {generated_prompt}")
-                # 文生图：始终用 positive_prompt_global
-                positive_prompt = self.config.get("positive_prompt_global", "") + generated_prompt
+            # 始终启用 LLM 自动生成 prompt
+            generated_prompt = await self.utils.generate_prompt_with_llm(prompt)
+            logger.debug(f"LLM generated prompt: {generated_prompt}")
+            # 文生图：始终用 positive_prompt_global
+            positive_prompt = self.config.get("positive_prompt_global", "") + generated_prompt
 
-                #输出正向提示词
-                if self.config.get("enable_show_positive_prompt", False):
-                    yield event.plain_result(f"{messages.MSG_POSITIVE_PROMPT_DISPLAY}: {positive_prompt}")
+            #输出正向提示词
+            if self.config.get("enable_show_positive_prompt", False):
+                yield event.plain_result(f"{messages.MSG_POSITIVE_PROMPT_DISPLAY}: {positive_prompt}")
 
-                # 生成图像
-                payload = await self.utils.generate_payload(positive_prompt)
-                response = await self.client.call_t2i_api(payload)
-                if not response.get("images"):
-                    raise ValueError(messages.MSG_API_RETURN_ERROR)
+            # 生成图像
+            payload = await self.utils.generate_payload(positive_prompt)
+            response = await self.client.call_t2i_api(payload)
+            if not response.get("images"):
+                raise ValueError(messages.MSG_API_RETURN_ERROR)
 
-                images = response["images"]
+            images = response["images"]
 
-                if len(images) == 1:
-                    image_data = response["images"][0]
-                    image_bytes = base64.b64decode(image_data)
-                    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+            async for result in self._process_and_yield_images(event, images, verbose):
+                yield result
 
-                    # 图像处理
-                    if self.config.get("enable_upscale"):
-                        if verbose:
-                            yield event.plain_result(messages.MSG_PROCESSING_IMAGE)
-                        image_b64 = await self.client.apply_image_processing(image_b64)
+    async def _handle_api_errors(self, event: AstrMessageEvent, func, *args, **kwargs):
+        """
+        通用API错误处理辅助函数。
+        """
+        try:
+            async for result in func(event, *args, **kwargs):
+                yield result
+        except ValueError as e:
+            logger.error(f"{messages.MSG_API_RETURN_ERROR_LOG}: {e}")
+            yield event.plain_result(f"{messages.MSG_API_ERROR}\n{e}")
+        except ConnectionError as e:
+            logger.error(f"{messages.MSG_CONNECTION_FAIL_LOG}: {e}")
+            yield event.plain_result(f"{messages.MSG_CONNECTION_ERROR}\n{e}")
+        except TimeoutError as e:
+            logger.error(f"{messages.MSG_TIMEOUT_ERROR_LOG}: {e}")
+            yield event.plain_result(f"{messages.MSG_TIMEOUT_ERROR}\n{e}")
+        except Exception as e:
+            logger.error(f"{messages.MSG_OTHER_ERROR_LOG}: {e}")
+            err_str = str(e)
+            if "http" in err_str or "https" in err_str:
+                err_str = messages.MSG_ERROR_API_HIDDEN
+            yield event.plain_result(f"{messages.MSG_OTHER_ERROR}\n{err_str}")
 
-                    yield event.chain_result([Image.fromBase64(image_b64)])
-                else:
-                    chain = []
+    async def _process_and_yield_images(self, event: AstrMessageEvent, images: list, verbose: bool):
+        """
+        处理图像（如放大）并发送结果。
+        """
+        chain = []
+        if self.config.get("enable_upscale") and verbose:
+            yield event.plain_result(messages.MSG_PROCESSING_IMAGE)
 
-                    if self.config.get("enable_upscale") and verbose:
-                        yield event.plain_result(messages.MSG_PROCESSING_IMAGE)
+        for image_data in images:
+            image_bytes = base64.b64decode(image_data)
+            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-                    for image_data in images:
-                        image_b64 = base64.b64decode(image_data)
-                        image_b64 = base64.b64encode(image_b64).decode("utf-8")
+            # 图像处理
+            if self.config.get("enable_upscale"):
+                image_b64 = await self.client.apply_image_processing(image_b64)
 
-                        # 图像处理
-                        if self.config.get("enable_upscale"):
-                            image_b64 = await self.client.apply_image_processing(image_b64)
+            # 添加到链对象
+            chain.append(Image.fromBase64(image_b64))
 
-                        # 添加到链对象
-                        chain.append(Image.fromBase64(image_b64))
-
-                    # 将链式结果发送给事件
-                    yield event.chain_result(chain)
-
-            except ValueError as e:
-                logger.error(f"{messages.MSG_API_RETURN_ERROR_LOG}: {e}")
-                yield event.plain_result(f"{messages.MSG_API_ERROR}\n{e}")
-            except ConnectionError as e:
-                logger.error(f"{messages.MSG_CONNECTION_FAIL_LOG}: {e}")
-                yield event.plain_result(f"{messages.MSG_CONNECTION_ERROR}\n{e}")
-            except TimeoutError as e:
-                logger.error(f"{messages.MSG_TIMEOUT_ERROR_LOG}: {e}")
-                yield event.plain_result(f"{messages.MSG_TIMEOUT_ERROR}\n{e}")
-            except Exception as e:
-                logger.error(f"{messages.MSG_OTHER_ERROR_LOG}: {e}")
-                # 过滤掉包含 http/https 的报错内容
-                err_str = str(e)
-                if "http" in err_str or "https" in err_str:
-                    err_str = messages.MSG_ERROR_API_HIDDEN
-                yield event.plain_result(f"{messages.MSG_OTHER_ERROR}\n{err_str}")
-            finally:
-                pass
+        # 将链式结果发送给事件
+        yield event.chain_result(chain)
 
     async def _img2img_impl(self, event: AstrMessageEvent, image_data: str, prompt: str):
         """实际的图生图逻辑，供 img2img_command/img2img_draw 调用"""
         async with self.task_semaphore:
-            try:
-                # 检查webui可用性
-                if not (await self.client.check_webui_available())[0]:
-                    yield event.plain_result(messages.MSG_WEBUI_UNAVAILABLE)
-                    return
+            # 检查webui可用性
+            if not (await self.client.check_webui_available())[0]:
+                yield event.plain_result(messages.MSG_WEBUI_UNAVAILABLE)
+                return
 
-                verbose = self.config["verbose"]
-                if verbose:
-                    yield event.plain_result(messages.MSG_IMG2IMG_GENERATING)
+            verbose = self.config["verbose"]
+            if verbose:
+                yield event.plain_result(messages.MSG_IMG2IMG_GENERATING)
 
-                # 获取图片尺寸
-                image_bytes = base64.b64decode(image_data)
-                with io.BytesIO(image_bytes) as f:
-                    pil_image = PILImage.open(f)
-                    original_width, original_height = pil_image.size
-                
-                # 提示分辨率自动调整
-                if verbose:
-                    closest_width, closest_height = self.utils._get_closest_resolution(original_width, original_height)
-                    yield event.plain_result(messages.MSG_IMG2IMG_RESOLUTION_AUTO_SET.format(width=closest_width, height=closest_height))
+            # 获取图片尺寸
+            image_bytes = base64.b64decode(image_data)
+            with io.BytesIO(image_bytes) as f:
+                pil_image = PILImage.open(f)
+                original_width, original_height = pil_image.size
+            
+            # 提示分辨率自动调整
+            if verbose:
+                closest_width, closest_height = self.utils._get_closest_resolution(original_width, original_height)
+                yield event.plain_result(messages.MSG_IMG2IMG_RESOLUTION_AUTO_SET.format(width=closest_width, height=closest_height))
 
-                # 这里不再调用 LLM，只用传入的 prompt
-                # 图生图：优先用 prompt_prefix.json
-                img2img_prefix = self._load_prompt_prefix()
-                if img2img_prefix:
-                    final_prompt = img2img_prefix + prompt
-                else:
-                    final_prompt = self.config.get("positive_prompt_global", "") + prompt
+            # 这里不再调用 LLM，只用传入的 prompt
+            # 图生图：优先用 prompt_prefix.json
+            img2img_prefix = self._load_prompt_prefix()
+            if img2img_prefix:
+                final_prompt = img2img_prefix + prompt
+            else:
+                final_prompt = self.config.get("positive_prompt_global", "") + prompt
 
-                # 生成图像
-                payload = await self.utils.generate_img2img_payload(image_data, final_prompt, original_width, original_height)
-                logger.debug(f"Img2img API Payload: {json.dumps(payload, indent=2)}") # 添加日志输出 payload
-                response = await self.client.call_i2i_api(payload)
-                if not response.get("images"):
-                    raise ValueError(messages.MSG_API_RETURN_ERROR)
+            # 生成图像
+            payload = await self.utils.generate_img2img_payload(image_data, final_prompt, original_width, original_height)
+            logger.debug(f"Img2img API Payload: {json.dumps(payload, indent=2)}") # 添加日志输出 payload
+            response = await self.client.call_i2i_api(payload)
+            if not response.get("images"):
+                raise ValueError(messages.MSG_API_RETURN_ERROR)
 
-                images = response["images"]
+            images = response["images"]
 
-                if len(images) == 1:
-                    image_data = response["images"][0]
-                    image_bytes = base64.b64decode(image_data)
-                    image = base64.b64encode(image_bytes).decode("utf-8")
-
-                    # 图像处理
-                    if self.config.get("enable_upscale"):
-                        if verbose:
-                            yield event.plain_result(messages.MSG_PROCESSING_IMAGE)
-                        image = await self.client.apply_image_processing(image)
-
-                    yield event.chain_result([Image.fromBase64(image)])
-                else:
-                    chain = []
-
-                    if self.config.get("enable_upscale") and verbose:
-                        yield event.plain_result(messages.MSG_PROCESSING_IMAGE)
-
-                    for image_data in images:
-                        image_bytes = base64.b64decode(image_data)
-                        image = base64.b64encode(image_bytes).decode("utf-8")
-
-                        # 图像处理
-                        if self.config.get("enable_upscale"):
-                            image = await self.client.apply_image_processing(image)
-
-                        # 添加到链对象
-                        chain.append(Image.fromBase64(image))
-
-                    # 将链式结果发送给事件
-                    yield event.chain_result(chain)
-
-            except ValueError as e:
-                logger.error(f"{messages.MSG_API_RETURN_ERROR_LOG}: {e}")
-                yield event.plain_result(f"{messages.MSG_IMG2IMG_API_ERROR}\n{e}")
-            except ConnectionError as e:
-                logger.error(f"{messages.MSG_CONNECTION_FAIL_LOG}: {e}")
-                yield event.plain_result(f"{messages.MSG_CONNECTION_ERROR}\n{e}")
-            except TimeoutError as e:
-                logger.error(f"{messages.MSG_TIMEOUT_ERROR_LOG}: {e}")
-                yield event.plain_result(f"{messages.MSG_TIMEOUT_ERROR}\n{e}")
-            except Exception as e:
-                logger.error(f"{messages.MSG_OTHER_ERROR_LOG}: {e}")
-                # 过滤掉包含 http/https 的报错内容
-                err_str = str(e)
-                if "http" in err_str or "https" in err_str:
-                    err_str = messages.MSG_ERROR_API_HIDDEN
-                yield event.plain_result(f"{messages.MSG_OTHER_ERROR}\n{err_str}")
-            finally:
-                pass
+            async for result in self._process_and_yield_images(event, images, verbose):
+                yield result
 
     @sd.command("gen")
     async def generate_image_command(self, event: AstrMessageEvent, prompt: str):
@@ -1178,7 +1133,6 @@ class SDGenerator(Star):
                     yield event.plain_result(f"当前 LLM_PROMPT_PREFIX：\n{value}")
                 else:
                     # 如果配置中没有，则显示默认值
-                    from .messages import MSG_DEFAULT_LLM_PROMPT_PREFIX
                     yield event.plain_result(f"当前 LLM_PROMPT_PREFIX：\n{MSG_DEFAULT_LLM_PROMPT_PREFIX}")
                 return
 
@@ -1261,32 +1215,6 @@ class SDGenerator(Star):
                 rules = "\n".join([f"{k} → {v}" for k, v in tags.items()])
                 yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
             return
-
-    @sd.command("tag改名")
-    async def tag_rename_command(self, event: AstrMessageEvent, *, content: str = ""):
-        """
-        快捷命令：/sd tag改名 旧名:新名
-        """
-        msg = content.strip()
-        if ":" not in msg:
-            yield event.plain_result("用法：/sd tag改名 旧名:新名")
-            return
-        old_key, new_key = msg.split(":", 1)
-        old_key = old_key.strip()
-        new_key = new_key.strip()
-        if not old_key or not new_key:
-            yield event.plain_result("旧名和新名都不能为空")
-            return
-        if old_key not in self.local_tag_mgr.tags:
-            yield event.plain_result(f"未找到tag：{old_key}")
-            return
-        if new_key in self.local_tag_mgr.tags:
-            yield event.plain_result(f"新名称已存在：{new_key}")
-            return
-        value = self.local_tag_mgr.tags[old_key]
-        self.local_tag_mgr.del_tag(old_key)
-        self.local_tag_mgr.set_tag(new_key, value)
-        yield event.plain_result(f"已将tag“{old_key}”重命名为“{new_key}”，内容为：{value}")
 
     @filter.command("搜索tag")
     async def search_tag(self, event: AstrMessageEvent):

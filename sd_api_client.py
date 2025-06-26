@@ -2,17 +2,23 @@ import asyncio
 import base64
 import os
 import aiohttp
-import httpx # 导入 httpx 库
 from astrbot.api.all import logger
 from . import messages
 
-TEMP_PATH = os.path.abspath("data/temp")
+from astrbot.api.star import StarTools # 导入 StarTools
+TEMP_PATH = StarTools.get_data_dir("SDGen") / "temp"
 
 class SDAPIClient:
     def __init__(self, config: dict):
         self.config = config
         self.session = None
         os.makedirs(TEMP_PATH, exist_ok=True)
+
+    async def close(self):
+        """关闭 aiohttp 会话"""
+        if self.session and not self.session.closed:
+            await self.session.close()
+            self.session = None
 
     async def ensure_session(self):
         """确保会话连接"""
@@ -26,13 +32,13 @@ class SDAPIClient:
         下载图片并将其转换为 Base64 编码字符串。
         如果下载失败，将抛出 httpx.RequestError 或其他异常。
         """
+        await self.ensure_session()
         try:
-            async with httpx.AsyncClient(timeout=self.config.get("session_timeout_time", 120)) as client:
-                response = await client.get(image_url)
-                response.raise_for_status() # 检查 HTTP 错误
-                image_bytes = response.content
+            async with self.session.get(image_url) as resp:
+                resp.raise_for_status() # 检查 HTTP 错误
+                image_bytes = await resp.read()
                 return base64.b64encode(image_bytes).decode("utf-8")
-        except httpx.RequestError as e:
+        except aiohttp.ClientError as e:
             logger.error(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL_LOG}: {e}")
             raise # 重新抛出异常，让调用者处理
         except Exception as e:
