@@ -94,10 +94,17 @@ class SDGenerator(Star):
             if k in prompt_str:
                 changed.append(f"{k}→{v}")
         prompt_str = replaced
-        # 先发“在画了在画了”，如有替换则追加tag提示
+        # 判断是否有“预设”相关tag
+        preset_tags = [item for item in changed if "预设" in item]
+        other_tags = [item for item in changed if "预设" not in item]
         msg = "在画了在画了"
         if changed:
-            msg += f"，为你替换了以下tag：{', '.join(changed)}"
+            if preset_tags and not other_tags:
+                msg += "，预设相关tag已替换"
+            elif preset_tags and other_tags:
+                msg += f"，为你替换了以下tag：{', '.join(other_tags)}，预设相关tag已替换"
+            else:
+                msg += f"，为你替换了以下tag：{', '.join(changed)}"
         await event.send(event.plain_result(msg))
         async for result in self._generate_image_impl(event, prompt_str, skip_verbose_msg=True):
             yield result
