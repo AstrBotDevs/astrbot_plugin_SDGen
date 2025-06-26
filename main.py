@@ -1184,7 +1184,7 @@ class SDGenerator(Star):
             yield event.plain_result(f"❌ 设置失败: {e}")
 
     @sd.command("tag")
-    async def tag_command(self, event: AstrMessageEvent, *, content: str = ""):
+    async def tag_command(self, event: AstrMessageEvent):
         """
         本地关键词替换管理
         用法：
@@ -1193,7 +1193,15 @@ class SDGenerator(Star):
         /sd tag                 # 查询所有
         /sd tag 改名 旧名:新名   # 修改tag名称（key重命名，value不变）
         """
-        msg = content.strip()
+        # 兼容各种前缀
+        raw = event.message_str
+        # 去除命令前缀
+        for prefix in [".sd tag", "/sd tag", "sd tag"]:
+            if raw.strip().lower().startswith(prefix):
+                msg = raw.strip()[len(prefix):].strip()
+                break
+        else:
+            msg = raw.strip()
         # 支持“改名 旧名:新名”
         if msg.startswith("改名 "):
             rename_part = msg[len("改名 "):].strip()
@@ -1217,7 +1225,6 @@ class SDGenerator(Star):
             self.local_tag_mgr.set_tag(new_key, value)
             yield event.plain_result(f"已将tag“{old_key}”重命名为“{new_key}”，内容为：{value}")
             return
-        # /sd tag del 关键词
         if msg.startswith("del "):
             key = msg[len("del "):].strip()
             if key in self.local_tag_mgr.tags:
@@ -1226,18 +1233,19 @@ class SDGenerator(Star):
             else:
                 yield event.plain_result(f"未找到本地tag：{key}")
             return
-        # /sd tag 关键词:替换内容
         elif ":" in msg:
             key, value = msg.split(":", 1)
             key = key.strip()
             value = value.strip()
+            logger.info(f"[tag设置] key: '{key}', value: '{value}'")
             if key:
                 self.local_tag_mgr.set_tag(key, value)
+                logger.info(f"[tag设置] 已设置: {key} → {value}")
                 yield event.plain_result(f"已设置本地tag：{key} → {value}")
             else:
+                logger.info("[tag设置] 关键词不能为空")
                 yield event.plain_result("关键词不能为空")
             return
-        # /sd tag 查询
         elif msg == "":
             tags = self.local_tag_mgr.get_all()
             if not tags:

@@ -19,9 +19,9 @@ class LocalTagManager:
         return {}
 
     def save(self):
-        with self.lock:
-            with open(self.path, "w", encoding="utf-8") as f:
-                json.dump(self.tags, f, ensure_ascii=False, indent=2)
+        # 不要再加锁，避免死锁
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(self.tags, f, ensure_ascii=False, indent=2)
 
     def replace(self, text: str) -> str:
         tags = sorted(self.tags.items(), key=lambda x: -len(x[0]))
