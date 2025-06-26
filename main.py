@@ -16,8 +16,10 @@ from .sd_api_client import SDAPIClient
 from .sd_utils import SDUtils
 from . import messages
 from .local_tag_utils import LocalTagManager
+import io
+from PIL import Image as PILImage
 
-PLUGIN_VERSION = "1.1.7"
+PLUGIN_VERSION = "1.1.8"
 
 @register("SDGen", "Maoer", "SDGen_Maoer", PLUGIN_VERSION)
 class SDGenerator(Star):
@@ -34,6 +36,10 @@ class SDGenerator(Star):
 
         self.local_tag_mgr = LocalTagManager(os.path.join(os.path.dirname(__file__), "local_tags.json"))
 
+        # 新增：prompt_prefix.json 路径
+        self.prompt_prefix_path = os.path.join(os.path.dirname(__file__), "prompt_prefix.json")
+        self._prompt_prefix_cache = None
+
     def _validate_config(self):
         """配置验证"""
         self.config["webui_url"] = self.config["webui_url"].strip()
@@ -45,15 +51,30 @@ class SDGenerator(Star):
             # 只有在实际修改了配置时才保存
             self.config.save_config()
 
+    # 替换关键词
+    def _replace_local_tags(self, text: str) -> str:
+        replaced = self.local_tag_mgr.replace(text)
+        if replaced != text:
+            # 只输出被替换的 tag 关键词
+            changed = []
+            for k, v in self.local_tag_mgr.tags.items():
+                if k in text:
+                    changed.append(f"{k}→{v}")
+            if changed:
+                logger.info(f"[本地tag替换] 替换了: {', '.join(changed)}")
+        return replaced
+
     @llm_tool("generate_image")
     async def generate_image(self, event: AstrMessageEvent, prompt: str):
-        """Generate images using Stable Diffusion based on the given prompt.
+        """
+        Generate images using Stable Diffusion based on the given prompt.
         This function should only be called when the prompt contains keywords like "generate," "draw," or "create."
         It should not be mistakenly used for image searching.
 
         Args:
             prompt (string): The prompt or description used for generating images.
         """
+        prompt = self._replace_local_tags(prompt)
         try:
             async for result in self._generate_image_impl(event, prompt):
                 yield result
@@ -61,16 +82,73 @@ class SDGenerator(Star):
             yield event.plain_result(f"下载图片时发生未知错误: {e}")
             return
 
-
     @filter.command("画")
     async def draw(self, event: AstrMessageEvent):
         """直接处理 .画 指令，规避 LLM 前置拦截，完整保留用户输入"""
         raw_msg = event.message_str
         prompt_str = raw_msg.lstrip(".／/画").strip()
-        prompt_str = self.local_tag_mgr.replace(prompt_str)
-        async for result in self._generate_image_impl(event, prompt_str):
+        # 记录替换前后内容
+        replaced = self.local_tag_mgr.replace(prompt_str)
+        changed = []
+        for k, v in self.local_tag_mgr.tags.items():
+            if k in prompt_str:
+                changed.append(f"{k}→{v}")
+        prompt_str = replaced
+        # 判断是否有“预设”相关tag
+        preset_tags = [item for item in changed if "预设" in item]
+        other_tags = [item for item in changed if "预设" not in item]
+        msg = "在画了在画了"
+        if changed:
+            if preset_tags and not other_tags:
+                msg += "，预设相关tag已替换"
+            elif preset_tags and other_tags:
+                msg += f"，为你替换了以下tag：{', '.join(other_tags)}，预设相关tag已替换"
+            else:
+                msg += f"，为你替换了以下tag：{', '.join(changed)}"
+        await event.send(event.plain_result(msg))
+        async for result in self._generate_image_impl(event, prompt_str, skip_verbose_msg=True):
             yield result
 
+    @filter.command("图生图", alias={"i2i_draw"})
+    async def img2img_draw(self, event: AstrMessageEvent):
+        """直接处理 .图生图 指令，规避 LLM 前置拦截，完整保留用户输入"""
+        image_data = None
+        if event.message_obj and event.message_obj.message:
+            for comp in event.message_obj.message:
+                if isinstance(comp, MessageImage) and hasattr(comp, 'url') and comp.url:
+                    try:
+                        image_data = await self.client.download_image_to_base64(comp.url)
+                        break
+                    except httpx.RequestError as e:
+                        yield event.plain_result(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL}: {e}")
+                        return
+                    except Exception as e:
+                        yield event.plain_result(f"下载图片时发生未知错误: {e}")
+                        return
+                else:
+                    logger.warning("MessageImage 组件没有 url 属性或 url 为空")
+                    yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE_URL)
+                    return
+        
+        if not image_data:
+            yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE)
+            return
+
+        raw_msg = event.message_str
+        # 移除命令前缀和图片信息，只保留提示词
+        prompt_str = re.sub(r"^\s*[.／/]?图生图\s*", "", raw_msg).strip()
+        # 移除消息链中的图片部分，只保留文本
+        if event.message_obj and event.message_obj.message:
+            # 过滤掉图片组件，只保留文本组件
+            # 确保只处理 MessageText 组件
+            text_components = [comp.text for comp in event.message_obj.message if isinstance(comp, MessageText)]
+            prompt_str = " ".join(text_components).strip()
+
+        # 在 img2img_draw 和 img2img_command 里
+        prompt_str = self._replace_local_tags(prompt_str)
+
+        async for result in self._img2img_impl(event, image_data, prompt_str):
+            yield result
 
     @command_group("sd")
     def sd(self):
@@ -89,7 +167,7 @@ class SDGenerator(Star):
             logger.error(f"{messages.MSG_CHECK_ERROR_LOG}: {e}")
             yield event.plain_result(f"{messages.MSG_CHECK_ERROR} | 插件版本: {PLUGIN_VERSION}")
     
-    async def _generate_image_impl(self, event: AstrMessageEvent, prompt: str):
+    async def _generate_image_impl(self, event: AstrMessageEvent, prompt: str, skip_verbose_msg=False):
         """实际的图像生成逻辑，供 generate_image/draw 调用"""
         async with self.task_semaphore:
             try:
@@ -99,12 +177,13 @@ class SDGenerator(Star):
                     return
 
                 verbose = self.config["verbose"]
-                if verbose:
+                if verbose and not skip_verbose_msg:
                     yield event.plain_result(messages.MSG_GENERATING)
 
                 # 始终启用 LLM 自动生成 prompt
                 generated_prompt = await self.utils.generate_prompt_with_llm(prompt)
                 logger.debug(f"LLM generated prompt: {generated_prompt}")
+                # 文生图：始终用 positive_prompt_global
                 positive_prompt = self.config.get("positive_prompt_global", "") + generated_prompt
 
                 #输出正向提示词
@@ -194,18 +273,11 @@ class SDGenerator(Star):
                     closest_width, closest_height = self.utils._get_closest_resolution(original_width, original_height)
                     yield event.plain_result(messages.MSG_IMG2IMG_RESOLUTION_AUTO_SET.format(width=closest_width, height=closest_height))
 
-                # 根据配置决定是否使用 LLM 生成提示词
-                enable_img2img_generate_prompt = self.config.get("enable_img2img_generate_prompt", True)
-                final_prompt = prompt # 这里的 prompt 是用户输入的原始提示词
-                
-                if enable_img2img_generate_prompt:
-                    generated_prompt = await self.utils.generate_prompt_with_llm(prompt)
-                    logger.debug(f"LLM generated img2img prompt: {generated_prompt}")
-                    if generated_prompt: # 如果 LLM 成功生成了提示词
-                        final_prompt = self.config.get("positive_prompt_global", "") + generated_prompt
-                    else: # 如果 LLM 没有生成有效提示词，回退到使用用户原始提示词
-                        logger.warning("LLM 未能为图生图生成有效提示词，将使用用户原始提示词。")
-                        final_prompt = self.config.get("positive_prompt_global", "") + prompt
+                # 这里不再调用 LLM，只用传入的 prompt
+                # 图生图：优先用 prompt_prefix.json
+                img2img_prefix = self._load_prompt_prefix()
+                if img2img_prefix:
+                    final_prompt = img2img_prefix + prompt
                 else:
                     final_prompt = self.config.get("positive_prompt_global", "") + prompt
 
@@ -275,73 +347,153 @@ class SDGenerator(Star):
         Args:
             prompt: 图像描述提示词
         """
-        prompt = self.local_tag_mgr.replace(prompt)
+        prompt = self._replace_local_tags(prompt)
         async for result in self._generate_image_impl(event, prompt):
             yield result
 
     @filter.command("i2i")
     async def img2img_command(self, event: AstrMessageEvent):
-        """图生图指令"""
+        """图生图指令，支持先发文本后补图，也支持一次性发图片+文本"""
         image_data = None
+        prompt_str = ""
+        # 提取文本描述
         if event.message_obj and event.message_obj.message:
-            for comp in event.message_obj.message:
-                if isinstance(comp, MessageImage):
-                    if hasattr(comp, 'url') and comp.url: # 检查是否有 url 属性
-                        try:
-                            async with httpx.AsyncClient() as client:
-                                response = await client.get(comp.url)
-                                response.raise_for_status() # 检查 HTTP 错误
-                                image_bytes = response.content
-                                image_data = base64.b64encode(image_bytes).decode("utf-8")
-                                break
-                        except httpx.RequestError as e:
-                            logger.error(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL_LOG}: {e}")
-                            yield event.plain_result(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL}: {e}")
-                            return
-                    else:
-                        logger.warning("MessageImage 组件没有 url 属性或 url 为空")
-                        yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE_URL)
-                        return
-
-        if not image_data:
-            yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE)
-            return
-
-        # 明确停止事件传播，防止 LLM 再次尝试调用其工具
-        event.stop_event()
-
-        # 移除命令前缀和图片信息，只保留提示词
-        raw_msg = event.message_str
-        prompt_str = re.sub(r"^\s*[.／/]?i2i\s*", "", raw_msg).strip()
-        # 移除消息链中的图片部分，只保留文本
-        if event.message_obj and event.message_obj.message:
-            # 过滤掉图片组件，只保留文本组件
             text_components = [comp.text for comp in event.message_obj.message if hasattr(comp, 'text') and not isinstance(comp, MessageImage)]
             prompt_str = " ".join(text_components).strip()
+        prompt_str = self._replace_local_tags(prompt_str)
 
-        # 现在继续执行实际的图生图逻辑
-        async for result in self._img2img_impl(event, image_data, prompt_str):
+        # 检查是否有图片
+        if event.message_obj and event.message_obj.message:
+            for comp in event.message_obj.message:
+                if isinstance(comp, MessageImage) and hasattr(comp, 'url') and comp.url:
+                    try:
+                        async with httpx.AsyncClient() as client:
+                            response = await client.get(comp.url)
+                            response.raise_for_status()
+                            image_bytes = response.content
+                            image_data = base64.b64encode(image_bytes).decode("utf-8")
+                            break
+                    except httpx.RequestError as e:
+                        logger.error(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL_LOG}: {e}")
+                        yield event.plain_result(f"{messages.MSG_IMG2IMG_DOWNLOAD_FAIL}: {e}")
+                        return
+                    except Exception as e:
+                        yield event.plain_result(f"图片下载失败: {e}")
+                        return
+
+        # 没有图片，立即提示并并发等待图片和LLM
+        if not image_data:
+            if not prompt_str:
+                yield event.plain_result("⚠️ 图生图指令需要您附带一张图片或描述词！")
+                return
+
+            await event.send(event.plain_result("⚠️ 图生图指令需要您附带一张图片！请在2分钟内补发图片。"))
+
+            # 并发等待图片和LLM
+            async def wait_for_image():
+                image_data2 = None
+                @session_waiter(timeout=120)
+                async def waiter(controller: SessionController, event2: AstrMessageEvent):
+                    nonlocal image_data2
+                    if event2.message_obj and event2.message_obj.message:
+                        for comp in event2.message_obj.message:
+                            if isinstance(comp, MessageImage) and hasattr(comp, 'url') and comp.url:
+                                try:
+                                    async with httpx.AsyncClient() as client:
+                                        response = await client.get(comp.url)
+                                        response.raise_for_status()
+                                        image_bytes = response.content
+                                        image_data2 = base64.b64encode(image_bytes).decode("utf-8")
+                                        break
+                                except Exception as e:
+                                    await event2.send(event2.plain_result(f"图片下载失败: {e}"))
+                                    controller.stop()
+                                    return
+                    if image_data2:
+                        event2.stop_event()
+                        controller.stop()
+                        return
+                    await event2.send(event2.plain_result("⚠️ 请发送一张图片以完成图生图。"))
+                try:
+                    await waiter(event)
+                except TimeoutError:
+                    return None
+                return image_data2
+
+            # 并发等待图片和LLM
+            tasks = [
+                asyncio.create_task(wait_for_image()),
+                asyncio.create_task(self.utils.generate_prompt_with_llm(prompt_str)) if self.config.get("enable_img2img_generate_prompt", True) else asyncio.create_task(asyncio.sleep(0, result=prompt_str))
+            ]
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            image_data2 = tasks[0].result()
+            llm_prompt = tasks[1].result() if tasks[1].result() else prompt_str
+            # 图生图：优先用 prompt_prefix.json
+            img2img_prefix = self._load_prompt_prefix()
+            if img2img_prefix:
+                llm_prompt = img2img_prefix + llm_prompt
+            else:
+                llm_prompt = self.config.get("positive_prompt_global", "") + llm_prompt
+
+            if not image_data2:
+                yield event.plain_result("等待图片超时，已取消本次图生图。")
+                return
+
+            async for result in self._img2img_impl(event, image_data2, llm_prompt):
+                yield result
+            return
+
+        # 有图片，立即处理文本（LLM），然后生成
+        llm_prompt = prompt_str
+        if self.config.get("enable_img2img_generate_prompt", True):
+            llm_prompt2 = await self.utils.generate_prompt_with_llm(prompt_str)
+            if llm_prompt2:
+                llm_prompt = llm_prompt2
+        img2img_prefix = self._load_prompt_prefix()
+        if img2img_prefix:
+            llm_prompt = img2img_prefix + llm_prompt
+        else:
+            llm_prompt = self.config.get("positive_prompt_global", "") + llm_prompt
+
+        event.stop_event()
+        async for result in self._img2img_impl(event, image_data, llm_prompt):
             yield result
 
     @sd.group("i2i")
     def i2i(self):
         pass
 
-    @i2i.command("denoising")
-    async def set_denoising_strength(self, event: AstrMessageEvent, strength: float):
-        """设置图生图重绘幅度"""
+    @i2i.command("prompt_prefix")
+    async def set_img2img_prompt_prefix(self, event: AstrMessageEvent):
+        """
+        设置或查询图生图正向提示词前缀。
+        用法：
+        /sd i2i prompt_prefix [新内容]  # 设置
+        /sd i2i prompt_prefix           # 查询当前内容
+        说明：你可以直接在命令后输入你的说明或前缀内容，支持长文本。
+        """
         try:
-            if strength < 0.0 or strength > 1.0:
-                yield event.plain_result(messages.MSG_DENOISING_STRENGTH_RANGE_ERROR)
+            # 兼容各种前缀写法
+            raw = event.message_str
+            prefix_content = None
+            for prefix in [".sd i2i prompt_prefix", "/sd i2i prompt_prefix", "sd i2i prompt_prefix"]:
+                if raw.strip().lower().startswith(prefix):
+                    prefix_content = raw.strip()[len(prefix):].strip()
+                    break
+
+            if not prefix_content:
+                value = self._load_prompt_prefix()
+                if value:
+                    yield event.plain_result(f"当前图生图正向提示词前缀：\n{value}")
+                else:
+                    yield event.plain_result("当前图生图正向提示词前缀未设置，将使用文生图前缀。")
                 return
 
-            self.config["img2img_params"]["denoising_strength"] = strength
-            self.config.save_config()
-
-            yield event.plain_result(messages.MSG_DENOISING_STRENGTH_SET_SUCCESS.format(strength=strength))
+            self._save_prompt_prefix(prefix_content)
+            yield event.plain_result("✅ 图生图正向提示词前缀已更新")
         except Exception as e:
-            logger.error(f"{messages.MSG_DENOISING_STRENGTH_SET_FAIL_LOG}: {e}")
-            yield event.plain_result(messages.MSG_DENOISING_STRENGTH_SET_FAIL)
+            logger.error(f"设置图生图正向提示词前缀失败: {e}")
+            yield event.plain_result(f"❌ 设置失败: {e}")
 
     @sd.command("verbose")
     async def set_verbose(self, event: AstrMessageEvent):
@@ -471,6 +623,8 @@ class SDGenerator(Star):
             "",
             messages.MSG_MAIN_COMMANDS_TITLE,
             messages.MSG_GEN_COMMAND,
+            messages.MSG_IMG2IMG_COMMAND,
+            messages.MSG_IMG2IMG_DRAW_COMMAND,
             messages.MSG_CHECK_COMMAND,
             messages.MSG_CONF_COMMAND,
             messages.MSG_HELP_COMMAND,
@@ -486,7 +640,7 @@ class SDGenerator(Star):
             messages.MSG_BATCH_COMMAND,
             messages.MSG_ITER_COMMAND,
             "",
-            messages.MSG_IMG2IMG_COMMANDS_TITLE, # 新增图生图命令标题
+            messages.MSG_IMG2IMG_COMMANDS_TITLE,
             messages.MSG_DENOISING_STRENGTH_COMMAND,
             messages.MSG_I2I_RES_COMMAND,
             messages.MSG_I2I_STEP_COMMAND,
@@ -513,6 +667,11 @@ class SDGenerator(Star):
             messages.MSG_NOTES_LLM_PROMPT,
             messages.MSG_NOTES_CUSTOM_PROMPT,
             messages.MSG_NOTES_INDEX_WARNING,
+            "",
+            "- /sd i2i prompt_prefix [内容]：设置/查询图生图正向提示词前缀（永久保存，支持长文本，存储于 prompt_prefix.json）。",
+            "- /sd set_llm_prompt_prefix [内容]：设置/查询LLM提示词前缀（保存到config.json）。",
+            "- /sd tag 关键词:替换内容：添加/更新本地tag，/sd tag del 关键词 删除，/sd tag 查询所有。",
+            "- /sd conf 可查看所有当前参数和前缀。",
         ]
         yield event.plain_result("\n".join(help_msg))
 
@@ -657,6 +816,24 @@ class SDGenerator(Star):
             logger.error(f"{messages.MSG_ITER_SET_FAIL_LOG}: {e}")
             yield event.plain_result(messages.MSG_ITER_SET_FAIL)
 
+    @i2i.command("denoising")
+    async def set_i2i_denoising_strength(self, event: AstrMessageEvent, strength: float):
+        """
+        设置图生图重绘幅度（denoising_strength）。
+        用法：
+        /sd i2i denoising [0.0~1.0]
+        例如：/sd i2i denoising 0.7
+        """
+        try:
+            if strength < 0.0 or strength > 1.0:
+                yield event.plain_result(messages.MSG_DENOISING_STRENGTH_RANGE_ERROR)
+                return
+            self.config["img2img_params"]["denoising_strength"] = strength
+            self.config.save_config()
+            yield event.plain_result(messages.MSG_DENOISING_STRENGTH_SET_SUCCESS.format(strength=strength))
+        except Exception as e:
+            logger.error(f"{messages.MSG_DENOISING_STRENGTH_SET_FAIL_LOG}: {e}")
+            yield event.plain_result(messages.MSG_DENOISING_STRENGTH_SET_FAIL)
 
     @sd.group("model")
     def model(self):
@@ -723,8 +900,8 @@ class SDGenerator(Star):
             if not lora_models:
                 yield event.plain_result(messages.MSG_LORA_LIST_EMPTY)
             else:
-                lora_model_list = "\n".join(f"{i + 1}. {lora}" for i, lora in enumerate(lora_models))
-                yield event.plain_result(messages.MSG_LORA_LIST_SUCCESS.format(lora_model_list=lora_model_list))
+                lora_list = "\n".join(f"{i + 1}. {lora}" for i, lora in enumerate(lora_models))
+                yield event.plain_result(messages.MSG_LORA_LIST_SUCCESS.format(lora_list=lora_list))
         except Exception as e:
             yield event.plain_result(messages.MSG_LORA_LIST_FAIL.format(error=str(e)))
 
@@ -768,7 +945,6 @@ class SDGenerator(Star):
                 selected_sampler = samplers[index]
                 self.config["default_params"]["sampler"] = selected_sampler
                 self.config.save_config()
-
                 yield event.plain_result(messages.MSG_SAMPLER_SET_SUCCESS.format(selected_sampler=selected_sampler))
             except ValueError:
                 yield event.plain_result(messages.MSG_INVALID_INDEX_INPUT)
@@ -903,7 +1079,7 @@ class SDGenerator(Star):
             try:
                 index = int(sampler_index) - 1
                 if index < 0 or index >= len(samplers):
-                    yield event.plain_result(messages.MSG_INVALID_SAMPLER_INDEX)
+                    yield event.plain_result(messages.MSG_INVALID_SAMPLER)
                     return
 
                 selected_sampler = samplers[index]
@@ -1015,16 +1191,47 @@ class SDGenerator(Star):
             yield event.plain_result(f"❌ 设置失败: {e}")
 
     @sd.command("tag")
-    async def tag_command(self, event: AstrMessageEvent, *, content: str = ""):
+    async def tag_command(self, event: AstrMessageEvent):
         """
         本地关键词替换管理
         用法：
         /sd tag 关键词:替换内容   # 添加或更新
         /sd tag del 关键词       # 删除
         /sd tag                 # 查询所有
+        /sd tag 改名 旧名:新名   # 修改tag名称（key重命名，value不变）
         """
-        msg = content
-        # /sd tag del 关键词
+        # 兼容各种前缀
+        raw = event.message_str
+        # 去除命令前缀
+        for prefix in [".sd tag", "/sd tag", "sd tag"]:
+            if raw.strip().lower().startswith(prefix):
+                msg = raw.strip()[len(prefix):].strip()
+                break
+        else:
+            msg = raw.strip()
+        # 支持“改名 旧名:新名”
+        if msg.startswith("改名 "):
+            rename_part = msg[len("改名 "):].strip()
+            if ":" not in rename_part:
+                yield event.plain_result("用法：/sd tag改名 旧名:新名")
+                return
+            old_key, new_key = rename_part.split(":", 1)
+            old_key = old_key.strip()
+            new_key = new_key.strip()
+            if not old_key or not new_key:
+                yield event.plain_result("旧名和新名都不能为空")
+                return
+            if old_key not in self.local_tag_mgr.tags:
+                yield event.plain_result(f"未找到tag：{old_key}")
+                return
+            if new_key in self.local_tag_mgr.tags:
+                yield event.plain_result(f"新名称已存在：{new_key}")
+                return
+            value = self.local_tag_mgr.tags[old_key]
+            self.local_tag_mgr.del_tag(old_key)
+            self.local_tag_mgr.set_tag(new_key, value)
+            yield event.plain_result(f"已将tag“{old_key}”重命名为“{new_key}”，内容为：{value}")
+            return
         if msg.startswith("del "):
             key = msg[len("del "):].strip()
             if key in self.local_tag_mgr.tags:
@@ -1033,18 +1240,19 @@ class SDGenerator(Star):
             else:
                 yield event.plain_result(f"未找到本地tag：{key}")
             return
-        # /sd tag 关键词:替换内容
         elif ":" in msg:
             key, value = msg.split(":", 1)
             key = key.strip()
             value = value.strip()
+            logger.info(f"[tag设置] key: '{key}', value: '{value}'")
             if key:
                 self.local_tag_mgr.set_tag(key, value)
+                logger.info(f"[tag设置] 已设置: {key} → {value}")
                 yield event.plain_result(f"已设置本地tag：{key} → {value}")
             else:
+                logger.info("[tag设置] 关键词不能为空")
                 yield event.plain_result("关键词不能为空")
             return
-        # /sd tag 查询
         elif msg == "":
             tags = self.local_tag_mgr.get_all()
             if not tags:
@@ -1053,3 +1261,68 @@ class SDGenerator(Star):
                 rules = "\n".join([f"{k} → {v}" for k, v in tags.items()])
                 yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
             return
+
+    @sd.command("tag改名")
+    async def tag_rename_command(self, event: AstrMessageEvent, *, content: str = ""):
+        """
+        快捷命令：/sd tag改名 旧名:新名
+        """
+        msg = content.strip()
+        if ":" not in msg:
+            yield event.plain_result("用法：/sd tag改名 旧名:新名")
+            return
+        old_key, new_key = msg.split(":", 1)
+        old_key = old_key.strip()
+        new_key = new_key.strip()
+        if not old_key or not new_key:
+            yield event.plain_result("旧名和新名都不能为空")
+            return
+        if old_key not in self.local_tag_mgr.tags:
+            yield event.plain_result(f"未找到tag：{old_key}")
+            return
+        if new_key in self.local_tag_mgr.tags:
+            yield event.plain_result(f"新名称已存在：{new_key}")
+            return
+        value = self.local_tag_mgr.tags[old_key]
+        self.local_tag_mgr.del_tag(old_key)
+        self.local_tag_mgr.set_tag(new_key, value)
+        yield event.plain_result(f"已将tag“{old_key}”重命名为“{new_key}”，内容为：{value}")
+
+    @filter.command("搜索tag")
+    async def search_tag(self, event: AstrMessageEvent):
+        """模糊搜索本地tag，例：.搜索tag 岛风"""
+        raw_msg = event.message_str
+        # 去除命令前缀，支持.搜索tag/搜索tag
+        keyword = raw_msg.lstrip(".／/搜索tag").strip()
+        if not keyword:
+            yield event.plain_result("请输入要搜索的关键词，例如 .搜索tag 岛风")
+            return
+        results = []
+        for k, v in self.local_tag_mgr.tags.items():
+            if keyword in k or keyword in v:
+                results.append(f"{k} → {v}")
+        if results:
+            yield event.plain_result("搜索结果：\n" + "\n".join(results))
+        else:
+            yield event.plain_result("未找到包含该关键词的tag。")
+
+    def _load_prompt_prefix(self):
+        if self._prompt_prefix_cache is not None:
+            return self._prompt_prefix_cache
+        if os.path.exists(self.prompt_prefix_path):
+            try:
+                with open(self.prompt_prefix_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self._prompt_prefix_cache = data.get("prompt_prefix", "")
+                    return self._prompt_prefix_cache
+            except Exception as e:
+                logger.error(f"读取 prompt_prefix.json 失败: {e}")
+        return ""
+
+    def _save_prompt_prefix(self, value: str):
+        try:
+            with open(self.prompt_prefix_path, "w", encoding="utf-8") as f:
+                json.dump({"prompt_prefix": value}, f, ensure_ascii=False, indent=2)
+            self._prompt_prefix_cache = value
+        except Exception as e:
+            logger.error(f"写入 prompt_prefix.json 失败: {e}")
