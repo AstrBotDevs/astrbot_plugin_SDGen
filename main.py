@@ -3,6 +3,9 @@ import asyncio
 import re
 import json
 import os
+import httpx
+import io
+from PIL import Image as PILImage
 from astrbot.api.all import register, Context, AstrBotConfig, Star, logger, llm_tool, command_group, Image
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.event.filter import EventMessageType
@@ -56,12 +59,6 @@ class SDGenerator(Star):
             yield event.plain_result(f"下载图片时发生未知错误: {e}")
             return
 
-        if not image_data:
-            yield event.plain_result(messages.MSG_IMG2IMG_NO_IMAGE)
-            return
-
-        async for result in self._handle_llm_tool_error(event, self._img2img_impl, event, image_data, prompt):
-            yield result
 
     @filter.command("画")
     async def draw(self, event: AstrMessageEvent):
