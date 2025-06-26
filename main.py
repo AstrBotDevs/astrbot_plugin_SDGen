@@ -60,17 +60,13 @@ class SDGenerator(Star):
             self.config.save_config()
 
     # 替换关键词
-    def _replace_local_tags(self, text: str) -> str:
-        replaced = self.local_tag_mgr.replace(text)
-        if replaced != text:
-            # 只输出被替换的 tag 关键词
-            changed = []
-            for k, v in self.local_tag_mgr.tags.items():
-                if k in text:
-                    changed.append(f"{k}→{v}")
-            if changed:
-                logger.info(f"[本地tag替换] 替换了: {', '.join(changed)}")
-        return replaced
+    def _replace_local_tags(self, text: str) -> tuple[str, list[str]]:
+        replaced_text, changed_keys = self.local_tag_mgr.replace(text)
+        if changed_keys:
+            # 构造用于日志输出的 changed 列表
+            changed_display = [f"{k}→{self.local_tag_mgr.tags[k]}" for k in changed_keys]
+            logger.info(f"[本地tag替换] 替换了: {', '.join(changed_display)}")
+        return replaced_text, changed_keys
 
     @llm_tool("generate_image")
     async def generate_image(self, event: AstrMessageEvent, prompt: str):
@@ -82,7 +78,7 @@ class SDGenerator(Star):
         Args:
             prompt (string): The prompt or description used for generating images.
         """
-        prompt = self._replace_local_tags(prompt)
+        prompt, _ = self._replace_local_tags(prompt) # 忽略 changed_keys
         try:
             async for result in self._generate_image_impl(event, prompt):
                 yield result
@@ -95,24 +91,25 @@ class SDGenerator(Star):
         """直接处理 .画 指令，规避 LLM 前置拦截，完整保留用户输入"""
         raw_msg = event.message_str
         prompt_str = raw_msg.lstrip(".／/画").strip()
+        
         # 记录替换前后内容
-        replaced = self.local_tag_mgr.replace(prompt_str)
-        changed = []
-        for k, v in self.local_tag_mgr.tags.items():
-            if k in prompt_str:
-                changed.append(f"{k}→{v}")
-        prompt_str = replaced
+        prompt_str, changed_keys = self._replace_local_tags(prompt_str)
+        
+        # 构造用于消息显示的 changed 列表
+        changed_display = [f"{k}→{self.local_tag_mgr.tags[k]}" for k in changed_keys]
+
         # 判断是否有“预设”相关tag
-        preset_tags = [item for item in changed if "预设" in item]
-        other_tags = [item for item in changed if "预设" not in item]
+        preset_tags = [item for item in changed_display if "预设" in item]
+        other_tags = [item for item in changed_display if "预设" not in item]
+        
         msg = "在画了在画了"
-        if changed:
+        if changed_display:
             if preset_tags and not other_tags:
                 msg += "，预设相关tag已替换"
             elif preset_tags and other_tags:
                 msg += f"，为你替换了以下tag：{', '.join(other_tags)}，预设相关tag已替换"
             else:
-                msg += f"，为你替换了以下tag：{', '.join(changed)}"
+                msg += f"，为你替换了以下tag：{', '.join(changed_display)}"
         await event.send(event.plain_result(msg))
         async for result in self._generate_image_impl(event, prompt_str, skip_verbose_msg=True):
             yield result
@@ -153,7 +150,7 @@ class SDGenerator(Star):
             prompt_str = " ".join(text_components).strip()
 
         # 在 img2img_draw 和 img2img_command 里
-        prompt_str = self._replace_local_tags(prompt_str)
+        prompt_str, _ = self._replace_local_tags(prompt_str) # 忽略 changed_keys
 
         async for result in self._img2img_impl(event, image_data, prompt_str):
             yield result
@@ -315,7 +312,7 @@ class SDGenerator(Star):
         if event.message_obj and event.message_obj.message:
             text_components = [comp.text for comp in event.message_obj.message if hasattr(comp, 'text') and not isinstance(comp, MessageImage)]
             prompt_str = " ".join(text_components).strip()
-        prompt_str = self._replace_local_tags(prompt_str)
+        prompt_str, _ = self._replace_local_tags(prompt_str) # 忽略 changed_keys
 
         # 检查是否有图片
         if event.message_obj and event.message_obj.message:

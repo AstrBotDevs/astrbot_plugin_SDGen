@@ -29,11 +29,16 @@ class LocalTagManager:
         except Exception as e:
             logger.error(f"[LocalTagManager] 保存本地tag失败: {e}")
 
-    def replace(self, text: str) -> str:
+    def replace(self, text: str) -> tuple[str, list[str]]:
+        original_text = text
+        changed_tags = []
         tags = sorted(self.tags.items(), key=lambda x: -len(x[0]))
         for k, v in tags:
-            text = text.replace(k, v)
-        return text
+            if k in text: # 检查原始文本中是否存在该关键词
+                text = text.replace(k, v)
+                if k not in changed_tags: # 避免重复添加
+                    changed_tags.append(k)
+        return text, changed_tags
 
     def set_tag(self, key, value):
         with self.lock:
