@@ -1191,8 +1191,32 @@ class SDGenerator(Star):
         /sd tag 关键词:替换内容   # 添加或更新
         /sd tag del 关键词       # 删除
         /sd tag                 # 查询所有
+        /sd tag 改名 旧名:新名   # 修改tag名称（key重命名，value不变）
         """
         msg = content.strip()
+        # 支持“改名 旧名:新名”
+        if msg.startswith("改名 "):
+            rename_part = msg[len("改名 "):].strip()
+            if ":" not in rename_part:
+                yield event.plain_result("用法：/sd tag改名 旧名:新名")
+                return
+            old_key, new_key = rename_part.split(":", 1)
+            old_key = old_key.strip()
+            new_key = new_key.strip()
+            if not old_key or not new_key:
+                yield event.plain_result("旧名和新名都不能为空")
+                return
+            if old_key not in self.local_tag_mgr.tags:
+                yield event.plain_result(f"未找到tag：{old_key}")
+                return
+            if new_key in self.local_tag_mgr.tags:
+                yield event.plain_result(f"新名称已存在：{new_key}")
+                return
+            value = self.local_tag_mgr.tags[old_key]
+            self.local_tag_mgr.del_tag(old_key)
+            self.local_tag_mgr.set_tag(new_key, value)
+            yield event.plain_result(f"已将tag“{old_key}”重命名为“{new_key}”，内容为：{value}")
+            return
         # /sd tag del 关键词
         if msg.startswith("del "):
             key = msg[len("del "):].strip()
@@ -1222,6 +1246,32 @@ class SDGenerator(Star):
                 rules = "\n".join([f"{k} → {v}" for k, v in tags.items()])
                 yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
             return
+
+    @sd.command("tag改名")
+    async def tag_rename_command(self, event: AstrMessageEvent, *, content: str = ""):
+        """
+        快捷命令：/sd tag改名 旧名:新名
+        """
+        msg = content.strip()
+        if ":" not in msg:
+            yield event.plain_result("用法：/sd tag改名 旧名:新名")
+            return
+        old_key, new_key = msg.split(":", 1)
+        old_key = old_key.strip()
+        new_key = new_key.strip()
+        if not old_key or not new_key:
+            yield event.plain_result("旧名和新名都不能为空")
+            return
+        if old_key not in self.local_tag_mgr.tags:
+            yield event.plain_result(f"未找到tag：{old_key}")
+            return
+        if new_key in self.local_tag_mgr.tags:
+            yield event.plain_result(f"新名称已存在：{new_key}")
+            return
+        value = self.local_tag_mgr.tags[old_key]
+        self.local_tag_mgr.del_tag(old_key)
+        self.local_tag_mgr.set_tag(new_key, value)
+        yield event.plain_result(f"已将tag“{old_key}”重命名为“{new_key}”，内容为：{value}")
 
     @filter.command("搜索tag")
     async def search_tag(self, event: AstrMessageEvent):
