@@ -312,7 +312,25 @@ class SDGenerator(Star):
         if event.message_obj and event.message_obj.message:
             text_components = [comp.text for comp in event.message_obj.message if hasattr(comp, 'text') and not isinstance(comp, MessageImage)]
             prompt_str = " ".join(text_components).strip()
-        prompt_str, _ = self._replace_local_tags(prompt_str) # 忽略 changed_keys
+        # 替换tag并获取变更
+        prompt_str, changed_keys = self._replace_local_tags(prompt_str)
+
+        # 构造用于消息显示的 changed 列表
+        changed_display = [f"{k}→{self.local_tag_mgr.tags[k]}" for k in changed_keys]
+        preset_tags = [item for item in changed_display if "预设" in item]
+        other_tags = [item for item in changed_display if "预设" not in item]
+
+        # 优化消息合并输出
+        msg_lines = []
+        if changed_display:
+            if preset_tags and not other_tags:
+                msg_lines.append("预设相关tag已替换")
+            elif preset_tags and other_tags:
+                msg_lines.append(f"为你替换了以下tag：{', '.join(other_tags)}，预设相关tag已替换")
+            else:
+                msg_lines.append(f"为你替换了以下tag：{', '.join(changed_display)}")
+        if msg_lines:
+            await event.send(event.plain_result("\n".join(msg_lines)))
 
         # 检查是否有图片
         if event.message_obj and event.message_obj.message:
@@ -1213,23 +1231,30 @@ class SDGenerator(Star):
                 yield event.plain_result(f"本地tag规则：(用法/sd tag 关键词:替换内容)\n{rules}")
             return
 
-    @filter.command("搜索tag")
+    @filter.command("sd tag查找")
     async def search_tag(self, event: AstrMessageEvent):
-        """模糊搜索本地tag，例：.搜索tag 岛风"""
+        """
+        模糊搜索本地tag名称（key），例：.sd tag查找 岛风
+        只查找tag名称，不查找值，节省资源。
+        如果tag名称以“预设”开头，则只显示名称，不显示值。
+        """
         raw_msg = event.message_str
-        # 去除命令前缀，支持.搜索tag/搜索tag
-        keyword = raw_msg.lstrip(".／/搜索tag").strip()
+        # 去除命令前缀，支持.／/sd tag查找
+        keyword = raw_msg.lstrip(".／/sd tag查找").strip()
         if not keyword:
-            yield event.plain_result("请输入要搜索的关键词，例如 .搜索tag 岛风")
+            yield event.plain_result("请输入要搜索的关键词，例如 .sd tag查找 岛风")
             return
         results = []
-        for k, v in self.local_tag_mgr.tags.items():
-            if keyword in k or keyword in v:
-                results.append(f"{k} → {v}")
+        for k in self.local_tag_mgr.tags:
+            if keyword in k:
+                if k.startswith("预设"):
+                    results.append(k)
+                else:
+                    results.append(f"{k} → {self.local_tag_mgr.tags[k]}")
         if results:
             yield event.plain_result("搜索结果：\n" + "\n".join(results))
         else:
-            yield event.plain_result("未找到包含该关键词的tag。")
+            yield event.plain_result("未找到包含该关键词的tag名称。")
 
     def _load_prompt_prefix(self):
         if self._prompt_prefix_cache is not None:
@@ -1251,3 +1276,57 @@ class SDGenerator(Star):
             self._prompt_prefix_cache = value
         except Exception as e:
             logger.error(f"写入 prompt_prefix.json 失败: {e}")
+
+    @filter.command("原生画")
+    async def native_image(self, event: AstrMessageEvent):
+        """
+        .原生画 提示词
+        将提示词本地替换后直接输入给模型，不经过LLM处理，并告知用户替换内容。
+        """
+        raw_msg = event.message_str
+        # 去除命令前缀
+        prompt_str = raw_msg.lstrip(".／/原生画").strip()
+        prompt_str, changed_keys = self._replace_local_tags(prompt_str)
+
+        # 构造用于消息显示的 changed 列表
+        changed_display = [f"{k}→{self.local_tag_mgr.tags[k]}" for k in changed_keys]
+        preset_tags = [item for item in changed_display if "预设" in item]
+        other_tags = [item for item in changed_display if "预设" not in item]
+
+        msg = "在画了在画了"
+        if changed_display:
+            if preset_tags and not other_tags:
+                msg += "，预设相关tag已替换"
+            elif preset_tags and other_tags:
+                msg += f"，为你替换了以下tag：{', '.join(other_tags)}，预设相关tag已替换"
+            else:
+                msg += f"，为你替换了以下tag：{', '.join(changed_display)}"
+        yield event.plain_result(msg)
+
+        async with self.task_semaphore:
+            # 检查webui可用性
+            if not (await self.client.check_webui_available())[0]:
+                yield event.plain_result(messages.MSG_WEBUI_UNAVAILABLE)
+                return
+
+            verbose = self.config["verbose"]
+            if verbose:
+                yield event.plain_result(messages.MSG_GENERATING)
+
+            # 文生图：始终用 positive_prompt_global
+            positive_prompt = self.config.get("positive_prompt_global", "") + prompt_str
+
+            # 输出正向提示词
+            if self.config.get("enable_show_positive_prompt", False):
+                yield event.plain_result(f"{messages.MSG_POSITIVE_PROMPT_DISPLAY}: {positive_prompt}")
+
+            # 生成图像
+            payload = await self.utils.generate_payload(positive_prompt)
+            response = await self.client.call_t2i_api(payload)
+            if not response.get("images"):
+                raise ValueError(messages.MSG_API_RETURN_ERROR)
+
+            images = response["images"]
+
+            async for result in self._process_and_yield_images(event, images, verbose):
+                yield result

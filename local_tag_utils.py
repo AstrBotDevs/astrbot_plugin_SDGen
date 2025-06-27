@@ -53,3 +53,19 @@ class LocalTagManager:
 
     def get_all(self):
         return self.tags.copy()
+
+    def get_tag_replace_message(self, changed_keys: list) -> str:
+        """
+        根据 changed_keys 生成友好的替换提示消息。
+        """
+        if not changed_keys:
+            return ""
+        changed_display = [f"{k}→{self.tags[k]}" for k in changed_keys]
+        preset_tags = [item for item in changed_display if "预设" in item]
+        other_tags = [item for item in changed_display if "预设" not in item]
+        if preset_tags and not other_tags:
+            return "预设相关tag已替换"
+        elif preset_tags and other_tags:
+            return f"为你替换了以下tag：{', '.join(other_tags)}，预设相关tag已替换"
+        else:
+            return f"为你替换了以下tag：{', '.join(changed_display)}"
