@@ -5,64 +5,107 @@
         "default": "http://127.0.0.1:7860",
         "hint": "需要包含http://或https://前缀"
     },
+
     "verbose": {
         "type": "bool",
         "description": "控制回复的详略程度",
         "default": true,
         "hint": "设置为true时，将实时输出AI生图进行到了哪个阶段，否则仅输出最终图片"
     },
+
     "session_timeout_time": {
         "type": "int",
         "description": "会话判定超时时间，单位秒（s）",
         "default": 120,
         "hint": "默认为两分钟，根据需要修改。如果在这个时间内图片未能生成完毕，则终止本次请求，并发送提示消息。"
     },
+
     "max_concurrent_tasks": {
         "type": "int",
         "description": "最大并发任务数",
         "default": 10,
         "hint": "决定同一时间能处理的AI生图请求数量，请根据GPU显存大小和其他AI生图设置来酌情设定，免得在高频AI生图请求下爆显存导致程序运行缓慢甚至卡死"
     },
+
     "enable_generate_prompt": {
         "type": "bool",
         "description": "启用使用LLM生成正向提示词",
         "default": true,
         "hint": "设置为true时启用，开启时，当使用sd gen XXXX指令时，将XXXX先发送给LLM，再由LLM来生成正向提示词；关闭时，XXXX内容将直接作为提示词送入Stable diffusion"
     },
+
     "enable_upscale": {
         "type": "bool",
         "description": "启用高分辨率处理",
         "default": false,
         "hint": "设置为true时启用"
     },
+
     "enable_show_positive_prompt": {
         "type": "bool",
         "description": "启用输出正向提示词",
         "default": false,
         "hint": "设置为true时启用，开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正向提示词"
     },
+
     "positive_prompt_global": {
         "type": "string",
         "description": "全局正向提示词",
         "default": "",
         "hint": "会自动附加到所有AI生图请求的提示词词组中"
-    },
-            
-    "enable_positive_prompt_add_in_head_or_tail": {
-        "type": "bool",
-        "description": "加在头还是加在尾？",
-        "default": true,
-        "hint": "设置为true时，全局提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起"
+    },    
+
+    "promot_group": {
+        "type": "object",
+        "description": "提示词组合",
+        "items": {
+            "promot_group1": {
+            "type": "object",
+            "description": "提示词组合1",
+            "items":{
+                 "positive_prompt_global1": {
+                    "type": "string",
+                    "description": "全局正面提示词1",
+                    "default": "",
+                    "hint": "会自动附加到所有AI生图请求的提示词词组中"
+                },
+                
+                "negative_prompt_global1": {
+                    "type": "string",
+                    "description": "全局负面提示词1",
+                    "default": "",
+                    "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
+                }
+                
+             }
+            },
+        
+            "promot_group2": {
+             "type": "object",
+             "description": "提示词组合2",
+             "items": {
+
+             }
+            },
+
+
+            "promot_group3": {
+             "type": "object",
+             "description": "提示词组合3",
+             "items": {
+
+             }
+            },
+
+            "enable_positive_prompt_add_in_head_or_tail": {
+            "type": "bool",
+            "description": "加在头还是加在尾？",
+            "default": true,
+            "hint": "设置为true时，全局提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起" 
+            }
 
     },
-    
 
-    "negative_prompt_global": {
-        "type": "string",
-        "description": "全局负面提示词",
-        "default": "",
-        "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
-    },
     "default_params": {
         "type": "object",
         "description": "默认生成参数",
@@ -129,18 +172,21 @@
             }
         }
     },
+
     "base_model": {
         "type": "string",
         "description": "基础模型",
         "default": "",
         "hint": "默认为空，使用 `/sd model list` 获取，使用 `/sd model set <index>` 设置"
     },
+
     "prompt_guidelines": {
         "type": "string",
         "description": "LMM生成提示词时的附加限制",
         "default": "",
         "hint": "屏蔽色情内容等, 例如`任何被判断为色情的提示词都应该被替换，避免出现色情内容`"
     },
+
     "replace_space": {
         "type": "string",
         "description": "用于替代提示词中空格的字符",
@@ -148,4 +194,5 @@
         "hint": "因Astrbot底层原因，读取到提示词中的空格时会发生中断，因此需要将所有空格替换为另一个字符来绕开这个限制，在将提示词组送入AI生图软件前，它最终会被重新处理为空格。因此，请在此处填入一个必定不会出现在提示词中的字符，而你在写提示词时，也要将所有的空格都替换为这个字符，此处默认为英文波浪号“~”，且不得为空。"
         
     }
+    
 }
