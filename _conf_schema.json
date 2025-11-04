@@ -54,6 +54,13 @@
         "default": "",
         "hint": "会自动附加到所有AI生图请求的提示词词组中"
     },    
+    
+    "negative_prompt_global": {
+        "type": "string",
+        "description": "全局负面提示词",
+        "default": "",
+        "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
+    },
 
     "promot_group": {
         "type": "object",
