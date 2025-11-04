@@ -116,19 +116,18 @@
                 }
 
              }
-            },
-            "enable_positive_prompt_add_in_head_or_tail": {
-            "type": "bool",
-            "description": "加在头还是加在尾？",
-            "default": true,
-            "hint": "设置为true时，全局正面提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起" 
             }
        
         }
 
     },
 
-   
+    "enable_positive_prompt_add_in_head_or_tail": {
+            "type": "bool",
+            "description": "加在头还是加在尾？",
+            "default": true,
+            "hint": "设置为true时，全局正面提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起" 
+            },
 
     "default_params": {
         "type": "object",
