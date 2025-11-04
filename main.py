@@ -464,8 +464,8 @@ class SDGenerator(Star):
     async def set_timeout(self, event: AstrMessageEvent, time: int):
         """设置会话超时时间"""
         try:
-            if time < 10 or time > 300:
-                yield event.plain_result("⚠️ 超时时间需设置在 10 到 300 秒范围内")
+            if time < 10 or time > 1800:
+                yield event.plain_result("⚠️ 超时时间需设置在 10秒 到 1800秒 范围内")
                 return
 
             self.config["session_timeout_time"] = time
@@ -522,7 +522,7 @@ class SDGenerator(Star):
             "- `/sd upscale`：切换图像增强模式（用于超分辨率放大或高分修复）。",
             "- `/sd LLM`：在使用/sd gen指令时，将内容先发送给LLM，再由LLM来生成正向提示词",
             "- `/sd prompt`：开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正向提示词",
-            "- `/sd timeout [秒数]`：设置连接超时时间（建议范围：10 到 300 秒）。",
+            "- `/sd timeout [秒数]`：设置连接超时时间（建议范围：10 到 1800 秒）。",
             "- `/sd res  [宽度] [高度]`：设置图像生成的分辨率（高度和宽度均支持:1-2048之间的任意整数）。",
             "- `/sd step [步数]`：设置图像生成的步数（范围：10 到 50 步）。",
             "- `/sd batch [数量]`：设置发出AI生图请求后，每轮生成的图片数量（范围： 1 到 10 张）。"
