@@ -481,6 +481,7 @@ class SDGenerator(Star):
         """打印当前图像生成参数，包括当前使用的模型"""
         try:
             gen_params = self._get_generation_params()  # 获取当前图像参数
+            enable_positive_prompt_add_in_head_or_tail = self._get_enable_positive_prompt_add_in_head_or_tail # Test获取正向提示词加在头还是尾
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
 
@@ -491,7 +492,7 @@ class SDGenerator(Star):
 
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
-                f"Test：全局正面提示词加在 {'头部' if self.config.get('enable_positive_prompt_add_in_head_or_tail',True) else '尾部'}\n\n"
+                f"Test：全局正面提示词加在 {'头部' if enable_positive_prompt_add_in_head_or_tail else '尾部'}\n\n"
                 f"🔍  图像增强参数:\n{scale_params}\n\n"
                 f"🛠️  提示词附加要求: {prompt_guidelines}\n\n"
                 f"📢  详细输出模式: {'开启' if verbose else '关闭'}\n\n"
