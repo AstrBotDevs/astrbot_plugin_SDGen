@@ -492,8 +492,8 @@ class SDGenerator(Star):
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
                 f"Test：全局正面提示词加在 {'头部' if self.config.get('enable_positive_prompt_add_in_head_or_tail',True) else '尾部'}\n\n"
-                f"Test：正面提示词组1:{self.config.get("positive_prompt1")}\n\n"
-                f"Test：负面提示词组1:{self.config.get("negative_prompt1")}\n\n"
+                f"Test：正面提示词组1:{self.config.get("positive_prompt1","无法读取")}\n\n"
+                f"Test：负面提示词组1:{self.config.get("negative_prompt1","无法读取")}\n\n"
                 f"🔍  图像增强参数:\n{scale_params}\n\n"
                 f"🛠️  提示词附加要求: {prompt_guidelines}\n\n"
                 f"📢  详细输出模式: {'开启' if verbose else '关闭'}\n\n"
