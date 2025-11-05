@@ -487,8 +487,8 @@ class SDGenerator(Star):
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
             enable_positive_prompt_add_in_head_or_tail = self.config.get('enable_positive_prompt_add_in_head_or_tail',True) # 获取正面提示词添加位置
-            positive_prompt1 = positive_prompt_group["positive_prompt1"]   # 获取正面提示词1
-            negative_prompt1 = negative_prompt_group["negative_prompt1"]  # 获取负面提示词1
+            positive_prompt1 = positive_prompt_group["positive_prompt1", "无数据"]   # 获取正面提示词1
+            negative_prompt1 = negative_prompt_group["negative_prompt1", "无数据"]  # 获取负面提示词1
 
             verbose = self.config.get("verbose", True)  # 获取详略模式
             upscale = self.config.get("enable_upscale", False)  # 图像增强模式
