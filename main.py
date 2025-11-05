@@ -483,7 +483,7 @@ class SDGenerator(Star):
             gen_params = self._get_generation_params()  # 获取当前图像参数
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
-
+            enable_positive_prompt_add_in_head_or_tail = self.config.get('enable_positive_prompt_add_in_head_or_tail',True) # 获取正面提示词添加位置
             positive_prompt1 = self.config.get("positive_prompt1") or "无法读取"   # 获取正面提示词1
             negative_prompt1 = self.config.get("negative_prompt1") or "无法读取"  # 获取负面提示词1
 
@@ -494,7 +494,7 @@ class SDGenerator(Star):
 
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
-                f"Test：全局正面提示词加在 {'头部' if self.config.get('enable_positive_prompt_add_in_head_or_tail',True) else '尾部'}\n\n"
+                f"Test：全局正面提示词加在 {'头部' if enable_positive_prompt_add_in_head_or_tail else '尾部'}\n\n"
                 f"Test：正面提示词组1:{positive_prompt1}\n\n"
                 f"Test：负面提示词组1:{negative_prompt1}\n\n"
                 f"🔍  图像增强参数:\n{scale_params}\n\n"
