@@ -87,12 +87,8 @@
                 
              }
             },
-            
-            "positive_prompt1": {
-                    "type": "string",
-                    "description": "全局正面提示词1",
-                    "default": ""
-            },
+
+
         
             "negative_promot_group": {
              "type": "object",
@@ -123,6 +119,12 @@
         }
 
     },
+
+                "positive_prompt1": {
+                    "type": "string",
+                    "description": "全局正面提示词1",
+                    "default": ""
+            },
 
     "enable_positive_prompt_add_in_head_or_tail": {
             "type": "bool",
