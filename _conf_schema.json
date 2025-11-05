@@ -71,11 +71,7 @@
             "description": "正面提示词组合",
             "hint": "会自动附加到所有AI生图请求的提示词词组中，默认使用的正面提示词为1号。",
             "items":{
-                 "positive_prompt1": {
-                    "type": "string",
-                    "description": "全局正面提示词1",
-                    "default": ""
-                },
+                 
                 
                 "positive_prompt2": {
                     "type": "string",
@@ -90,6 +86,12 @@
                 }
                 
              }
+            },
+            
+            "positive_prompt1": {
+                    "type": "string",
+                    "description": "全局正面提示词1",
+                    "default": ""
             },
         
             "negative_promot_group": {
