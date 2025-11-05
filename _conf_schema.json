@@ -95,11 +95,7 @@
              "description": "负面提示词组合",
              "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例，默认使用的负面提示词为1号。",
              "items": {
-                "negative_prompt1": {
-                    "type": "string",
-                    "description": "全局负面提示词1",
-                    "default": ""
-                },
+                
                 
                 "negative_prompt2": {
                     "type": "string",
@@ -125,6 +121,12 @@
                     "description": "全局正面提示词1",
                     "default": ""
             },
+
+            "negative_prompt1": {
+                    "type": "string",
+                    "description": "全局负面提示词1",
+                    "default": ""
+                },
 
     "enable_positive_prompt_add_in_head_or_tail": {
             "type": "bool",
