@@ -484,6 +484,9 @@ class SDGenerator(Star):
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
 
+            positive_prompt1 = self.config.get("positive_prompt1","无法读取")   # 获取正面提示词1
+            negative_prompt1 = self.config.get("negative_prompt1","无法读取")   # 获取负面提示词1
+
             verbose = self.config.get("verbose", True)  # 获取详略模式
             upscale = self.config.get("enable_upscale", False)  # 图像增强模式
             show_positive_prompt = self.config.get("enable_show_positive_prompt", False)  # 是否显示正向提示词
@@ -492,8 +495,8 @@ class SDGenerator(Star):
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
                 f"Test：全局正面提示词加在 {'头部' if self.config.get('enable_positive_prompt_add_in_head_or_tail',True) else '尾部'}\n\n"
-                f"Test：正面提示词组1:{self.config.get("positive_prompt1","无法读取")}\n\n"
-                f"Test：负面提示词组1:{self.config.get("negative_prompt1","无法读取")}\n\n"
+                f"Test：正面提示词组1:{self.config.get(positive_prompt1)}\n\n"
+                f"Test：负面提示词组1:{self.config.get(negative_prompt1)}\n\n"
                 f"🔍  图像增强参数:\n{scale_params}\n\n"
                 f"🛠️  提示词附加要求: {prompt_guidelines}\n\n"
                 f"📢  详细输出模式: {'开启' if verbose else '关闭'}\n\n"
