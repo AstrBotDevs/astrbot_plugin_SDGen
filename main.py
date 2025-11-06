@@ -448,6 +448,21 @@ class SDGenerator(Star):
             logger.error(f"切换生成提示词功能失败: {e}")
             yield event.plain_result("❌ 切换生成提示词功能失败，请检查日志")
 
+    @sd.command("headtail")
+    async def set_generate_prompt(self, event: AstrMessageEvent):
+        """切换全局正向提示词添加位置"""
+        try:
+            current_setting = self.config.get("enable_positive_prompt_add_in_head_or_tail", False)
+            new_setting = not current_setting
+            self.config["enable_positive_prompt_add_in_head_or_tail"] = new_setting
+            self.config.save_config()
+
+            status = "头部" if new_setting else "尾部"
+            yield event.plain_result(f"📢 全局正面提示词现将添加在 {status}")
+        except Exception as e:
+            logger.error(f"切换全局正面提示词位置失败: {e}")
+            yield event.plain_result("❌ 切换全局正面提示词位置失败，请检查日志")
+
     @sd.command("prompt")
     async def set_show_prompt(self, event: AstrMessageEvent):
         """切换显示正向提示词功能"""
@@ -492,7 +507,7 @@ class SDGenerator(Star):
             gen_params = self._get_generation_params()  # 获取当前图像参数
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
-            enable_positive_prompt_add_in_head_or_tail = self.config.get('enable_positive_prompt_add_in_head_or_tail',True) # 获取正面提示词添加位置
+            enable_positive_prompt_add_in_head_or_tail = self.config.get('enable_positive_prompt_add_in_head_or_tail',True) # 获取全局正面提示词添加位置
             verbose = self.config.get("verbose", True)  # 获取详略模式
             upscale = self.config.get("enable_upscale", False)  # 图像增强模式
             show_positive_prompt = self.config.get("enable_show_positive_prompt", False)  # 是否显示正向提示词
