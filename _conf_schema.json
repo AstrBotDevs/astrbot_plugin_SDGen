@@ -57,14 +57,14 @@
             "global_positive_prompt_switch": {
                 "type": "bool",
                 "description": "全局正向提示词开关",
-                "default": "",
+                "default": false,
                 "hint": "决定是否启用全局正向提示词"
             },    
 
             "positive_prompt_add_in_head_or_tail_switch": {
             "type": "bool",
             "description": "全局/用户正面提示词加在头还是加在尾？",
-            "default": true,
+            "default": false,
             "hint": "此开关设置为true时，全局正面提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起。此开关也会影响用户预设正面提示词添加位置。" 
             },
 
@@ -78,7 +78,7 @@
             "global_nagative_prompt_switch": {
                 "type": "bool",
                 "description": "全局负面提示词开关",
-                "default": "",
+                "default": false,
                 "hint": "决定是否启用全局负面提示词"
             },    
 
@@ -227,7 +227,7 @@
         "type": "string",
         "description": "基础模型",
         "default": "",
-        "hint": "默认为空，使用 `/sd model list` 获取，使用 `/sd model set <index>` 设置"
+        "hint": "默认为空，使用 `/sd model list` 获取，使用 `/sd model set <index>` 设置，如不设置，则 自动使用Stable diffusion当前已加载的模型"
     },
 
     "prompt_guidelines": {
