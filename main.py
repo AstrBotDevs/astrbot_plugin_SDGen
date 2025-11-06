@@ -483,11 +483,8 @@ class SDGenerator(Star):
     async def show_conf(self, event: AstrMessageEvent):
         """打印当前图像生成参数，包括当前使用的模型"""
         try:
-            prompt_group = self.config["prompt_group"]  # 获取提示词组配置
-            positive_prompt_group = prompt_group["positive_prompt_group"]   # 获取正面提示词组
-            negative_prompt_group = prompt_group["negative_prompt_group"]   # 获取负面提示词组
-            positive_prompt1 = positive_prompt_group["positive_prompt1"]   # 获取正面提示词1
-            negative_prompt1 = negative_prompt_group["negative_prompt1"]  # 获取负面提示词1
+            positive_prompt1 = self.config["prompt_group"]["positive_prompt_group"]["positive_prompt1"] # 获取正向提示词组1
+            negative_prompt1 = self.config["prompt_group"]["negative_prompt_group"]["negative_prompt1"] # 获取负面提示词组1
             gen_params = self._get_generation_params()  # 获取当前图像参数
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
