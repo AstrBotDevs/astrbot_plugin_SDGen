@@ -48,45 +48,75 @@
         "hint": "设置为true时启用，开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正向提示词"
     },
 
-    "positive_prompt_global": {
-        "type": "string",
-        "description": "全局正向提示词",
-        "default": "",
-        "hint": "会自动附加到所有AI生图请求的提示词词组中"
-    },    
+    "global_prompt_group": {
+        "type": "object",
+        "description": "全局正负提示词",
+        "hint": "全局提示词仅可在此UI界面中设置，它们会自动附加到所有AI生图请求的提示词词组中，且无法利用指令关闭，来防止生成不该生成的图片，如果不需要，可以在此关闭。",
+        "items": {
 
-    "negative_prompt_global": {
-        "type": "string",
-        "description": "全局负面提示词",
-        "default": "",
-        "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
+            "global_positive_prompt_switch": {
+                "type": "bool",
+                "description": "全局正向提示词开关",
+                "default": "",
+                "hint": "决定是否启用全局正向提示词"
+            },    
+
+            "positive_prompt_add_in_head_or_tail_switch": {
+            "type": "bool",
+            "description": "全局/用户正面提示词加在头还是加在尾？",
+            "default": true,
+            "hint": "此开关设置为true时，全局正面提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起。此开关也会影响用户预设正面提示词添加位置。" 
+            },
+
+            "global_positive_prompt": {
+                "type": "string",
+                "description": "全局正向提示词",
+                "default": "",
+                "hint": "会自动附加到所有AI生图请求的提示词词组中"
+            },    
+
+            "global_nagative_prompt_switch": {
+                "type": "bool",
+                "description": "全局负面提示词开关",
+                "default": "",
+                "hint": "决定是否启用全局负面提示词"
+            },    
+
+            "global_negative_prompt": {
+                "type": "string",
+                "description": "全局负面提示词",
+                "default": "",
+                "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
+            }
+        }
     },
 
-    "prompt_group": {
+    "user_prompt_group": {
         "type": "object",
-        "description": "正负提示词预设组合",
+        "description": "用户预设正负提示词组合",
+        "hint": "在使用用户预设的正负提示词组合时，它们都会衔接在相应的正负全局提示词的尾部",
         "items": {
-            "positive_prompt_group": {
+            "user_positive_prompt_group": {
             "type": "object",
-            "description": "正面提示词组合",
+            "description": "用户预设正面提示词组合",
             "hint": "会自动附加到所有AI生图请求的提示词词组中，默认使用的正面提示词为1号。",
             "items":{
 
-                "positive_prompt1": {
+                "user_positive_prompt1": {
                     "type": "string",
-                    "description": "全局正面提示词1",
+                    "description": "用户预设正面提示词1",
                     "default": ""
                 },
                 
-                "positive_prompt2": {
+                "user_positive_prompt2": {
                     "type": "string",
-                    "description": "全局正面提示词2",
+                    "description": "用户预设正面提示词2",
                     "default": ""
                 },
 
-                "positive_prompt3": {
+                "user_positive_prompt3": {
                     "type": "string",
-                    "description": "全局正面提示词3",
+                    "description": "用户预设正面提示词3",
                     "default": ""
                 }
                 
@@ -95,27 +125,27 @@
 
 
         
-            "negative_prompt_group": {
+            "user_negative_prompt_group": {
              "type": "object",
-             "description": "负面提示词组合",
+             "description": "用户预设提示词组合",
              "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例，默认使用的负面提示词为1号。",
              "items": {
 
-                "negative_prompt1": {
+                "user_negative_prompt1": {
                     "type": "string",
-                    "description": "全局负面提示词1",
+                    "description": "用户预设负面提示词1",
                     "default": ""
                 },
                 
-                "negative_prompt2": {
+                "user_negative_prompt2": {
                     "type": "string",
-                    "description": "全局负面提示词2",
+                    "description": "用户预设负面提示词2",
                     "default": ""
                 },
 
-                "negative_prompt3": {
+                "user_negative_prompt3": {
                     "type": "string",
-                    "description": "全局负面提示词2",
+                    "description": "用户预设负面提示词2",
                     "default": ""
                 }
 
@@ -125,13 +155,6 @@
         }
 
     },
-
-    "enable_positive_prompt_add_in_head_or_tail": {
-            "type": "bool",
-            "description": "加在头还是加在尾？",
-            "default": true,
-            "hint": "设置为true时，全局正面提示词将会附着在用户输入的提示词组的开头，起到最大权重，如定义画风、设置安全等级。否则附着在尾部，权重偏低，适合用于修饰画面、提高出图质量、设定不重要的背景等。根据开关情况，记得在全局提示词的头部或尾部留逗号，免得最终的提示词黏在一起" 
-            },
 
     "default_params": {
         "type": "object",

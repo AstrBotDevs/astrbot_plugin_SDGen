@@ -103,7 +103,7 @@ class SDGenerator(Star):
 
         return {
             "prompt": prompt,
-            "negative_prompt": self.config["negative_prompt_global"],
+            "negative_prompt": self.config.get("global_prompt_group").get("global_negative_prompt", ""),
             "width": params["width"],
             "height": params["height"],
             "steps": params["steps"],
@@ -228,8 +228,8 @@ class SDGenerator(Star):
 
     def _get_generation_params(self) -> str:
         """获取当前图像生成的参数"""
-        positive_prompt_global = self.config.get("positive_prompt_global", "")
-        negative_prompt_global = self.config.get("negative_prompt_global", "")
+        global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")
+        global_negative_prompt = self.config.get("global_prompt_group").get("global_negative_prompt", "")
 
         params = self.config.get("default_params", {})
         width = params.get("width") or "未设置"
@@ -243,8 +243,8 @@ class SDGenerator(Star):
         base_model = self.config.get("base_model").strip() or "未设置"
 
         return (
-            f"- 全局正面提示词: {positive_prompt_global}\n"
-            f"- 全局负面提示词: {negative_prompt_global}\n"
+            f"- 全局正面提示词: {global_positive_prompt}\n"
+            f"- 全局负面提示词: {global_negative_prompt}\n"
             f"- 基础模型: {base_model}\n"
             f"- 图片尺寸: {width}x{height}\n"
             f"- 步数: {steps}\n"
@@ -269,7 +269,7 @@ class SDGenerator(Star):
     def sd(self):
         pass
 
-    @sd.command("check")
+    @sd.command("check")    # 服务状态检查
     async def check(self, event: AstrMessageEvent):
         """服务状态检查"""
         try:
@@ -282,7 +282,7 @@ class SDGenerator(Star):
             logger.error(f"❌ 检查可用性错误，报错{e}")
             yield event.plain_result("❌ 检查可用性错误，请检查日志")
 
-    @sd.command("gen")
+    @sd.command("gen")  # 生成图像指令
     async def generate_image(self, event: AstrMessageEvent, prompt: str):
         """生成图像指令
         Args:
@@ -302,24 +302,24 @@ class SDGenerator(Star):
 
                 # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
 
-                positive_prompt_global = self.config.get("positive_prompt_global", "")  # 获取全局正向提示词
-                enable_positive_prompt_add_in_head_or_tail = self.config.get("enable_positive_prompt_add_in_head_or_tail",True) # 获取正面提示词添加位置
+                global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")  # 获取全局正向提示词
+                positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get("positive_prompt_add_in_head_or_tail_switch",True) # 获取正面提示词添加位置
 
                 
                 if self.config.get("enable_generate_prompt"):   # 检查是否启用用LLM生成提示词
                     generated_prompt = await self._generate_prompt(prompt)
                     logger.debug(f"LLM generated prompt: {generated_prompt}")
-                    if enable_positive_prompt_add_in_head_or_tail:
-                        positive_prompt = positive_prompt_global + generated_prompt
+                    if positive_prompt_add_in_head_or_tail_switch:
+                        positive_prompt = global_positive_prompt + generated_prompt
                     
                     else:
-                        positive_prompt = generated_prompt + positive_prompt_global
+                        positive_prompt = generated_prompt + global_positive_prompt
                 else:   
                 # 使用用户提供的提示词    
-                    if enable_positive_prompt_add_in_head_or_tail:
-                        positive_prompt = positive_prompt_global + self._trans_prompt(prompt)
+                    if positive_prompt_add_in_head_or_tail_switch:
+                        positive_prompt = global_positive_prompt + self._trans_prompt(prompt)
                     else:
-                        positive_prompt = self._trans_prompt(prompt) + positive_prompt_global
+                        positive_prompt = self._trans_prompt(prompt) + global_positive_prompt
                     
 
                 #输出正向提示词
@@ -392,7 +392,7 @@ class SDGenerator(Star):
             finally:
                 self.active_tasks -= 1
 
-    @sd.command("verbose")
+    @sd.command("verbose")  # 切换详细输出模式
     async def set_verbose(self, event: AstrMessageEvent):
         """切换详细输出模式（verbose）"""
         try:
@@ -411,7 +411,7 @@ class SDGenerator(Star):
             logger.error(f"切换详细输出模式失败: {e}")
             yield event.plain_result("❌ 切换详细模式失败，请检查日志")
 
-    @sd.command("upscale")
+    @sd.command("upscale") # 切换图像增强模式
     async def set_upscale(self, event: AstrMessageEvent):
         """设置图像增强模式（enable_upscale）"""
         try:
@@ -433,7 +433,7 @@ class SDGenerator(Star):
             logger.error(f"切换图像增强模式失败: {e}")
             yield event.plain_result("❌ 切换图像增强模式失败，请检查日志")
 
-    @sd.command("LLM")
+    @sd.command("LLM")  # 切换生成提示词功能
     async def set_generate_prompt(self, event: AstrMessageEvent):
         """切换生成提示词功能"""
         try:
@@ -448,13 +448,13 @@ class SDGenerator(Star):
             logger.error(f"切换生成提示词功能失败: {e}")
             yield event.plain_result("❌ 切换生成提示词功能失败，请检查日志")
 
-    @sd.command("headtail")
-    async def set_positive_prompt_add_in_head_or_tail(self, event: AstrMessageEvent):
+    @sd.command("headtail") # 切换全局正向提示词添加位置
+    async def switch_positive_prompt_add_in_head_or_tail(self, event: AstrMessageEvent):
         """切换全局正向提示词添加位置"""
         try:
-            current_setting = self.config.get("enable_positive_prompt_add_in_head_or_tail", False)
+            current_setting = self.config.get("global_prompt_group").get("positive_prompt_add_in_head_or_tail_switch", False)
             new_setting = not current_setting
-            self.config["enable_positive_prompt_add_in_head_or_tail"] = new_setting
+            self.config["global_prompt_group"]["positive_prompt_add_in_head_or_tail_switch"] = new_setting
             self.config.save_config()
 
             status = "头部" if new_setting else "尾部"
@@ -463,7 +463,7 @@ class SDGenerator(Star):
             logger.error(f"切换全局正面提示词位置失败: {e}")
             yield event.plain_result("❌ 切换全局正面提示词位置失败，请检查日志")
 
-    @sd.command("prompt")
+    @sd.command("prompt") # 切换显示正向提示词功能
     async def set_show_prompt(self, event: AstrMessageEvent):
         """切换显示正向提示词功能"""
         try:
@@ -478,7 +478,7 @@ class SDGenerator(Star):
             logger.error(f"切换显示正向提示词功能失败: {e}")
             yield event.plain_result("❌ 切换显示正向提示词功能失败，请检查日志")
 
-    @sd.command("timeout")
+    @sd.command("timeout")  # 设置会话超时时间
     async def set_timeout(self, event: AstrMessageEvent, time: int):
         """设置会话超时时间"""
         try:
@@ -494,20 +494,20 @@ class SDGenerator(Star):
             logger.error(f"设置会话超时时间失败: {e}")
             yield event.plain_result("❌ 设置会话超时时间失败，请检查日志")
 
-    @sd.command("conf")
+    @sd.command("conf") # 输出当前各项配置
     async def show_conf(self, event: AstrMessageEvent):
         """打印当前图像生成参数，包括当前使用的模型"""
         try:
-            positive_prompt1 = self.config["prompt_group"]["positive_prompt_group"]["positive_prompt1"] # 获取正向提示词组1
-            positive_prompt2 = self.config["prompt_group"]["positive_prompt_group"]["positive_prompt2"] # 获取正向提示词组2
-            positive_prompt3 = self.config["prompt_group"]["positive_prompt_group"]["positive_prompt3"] # 获取正向提示词组3
-            negative_prompt1 = self.config["prompt_group"]["negative_prompt_group"]["negative_prompt1"] # 获取负面提示词组1
-            negative_prompt2 = self.config["prompt_group"]["negative_prompt_group"]["negative_prompt2"] # 获取负面提示词组2
-            negative_prompt3 = self.config["prompt_group"]["negative_prompt_group"]["negative_prompt3"] # 获取负面提示词组3
+            user_positive_prompt1 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt1"] # 获取正向提示词组1
+            user_positive_prompt2 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt2"] # 获取正向提示词组2
+            user_positive_prompt3 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt3"] # 获取正向提示词组3
+            user_negative_prompt1 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt1"] # 获取负面提示词组1
+            user_negative_prompt2 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt2"] # 获取负面提示词组2
+            user_negative_prompt3 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt3"] # 获取负面提示词组3
             gen_params = self._get_generation_params()  # 获取当前图像参数
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
-            enable_positive_prompt_add_in_head_or_tail = self.config.get('enable_positive_prompt_add_in_head_or_tail',True) # 获取全局正面提示词添加位置
+            positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get('positive_prompt_add_in_head_or_tail_switch',True) # 获取全局正面提示词添加位置
             verbose = self.config.get("verbose", True)  # 获取详略模式
             upscale = self.config.get("enable_upscale", False)  # 图像增强模式
             show_positive_prompt = self.config.get("enable_show_positive_prompt", False)  # 是否显示正向提示词
@@ -515,13 +515,13 @@ class SDGenerator(Star):
 
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
-                f"Test：全局正面提示词加在 {'头部' if enable_positive_prompt_add_in_head_or_tail else '尾部'}\n\n"
-                f"Test：正面提示词组1:{positive_prompt1}\n\n"
-                f"Test：正面提示词组2:{positive_prompt2}\n\n"
-                f"Test：正面提示词组3:{positive_prompt3}\n\n"
-                f"Test：负面提示词组1:{negative_prompt1}\n\n"
-                f"Test：负面提示词组2:{negative_prompt2}\n\n"
-                f"Test：负面提示词组3:{negative_prompt3}\n\n"
+                f"Test：全局正面提示词加在 {'头部' if positive_prompt_add_in_head_or_tail_switch else '尾部'}\n\n"
+                f"Test：正面提示词组1:{user_positive_prompt1}\n\n"
+                f"Test：正面提示词组2:{user_positive_prompt2}\n\n"
+                f"Test：正面提示词组3:{user_positive_prompt3}\n\n"
+                f"Test：负面提示词组1:{user_negative_prompt1}\n\n"
+                f"Test：负面提示词组2:{user_negative_prompt2}\n\n"
+                f"Test：负面提示词组3:{user_negative_prompt3}\n\n"
                 f"🔍  图像增强参数:\n{scale_params}\n\n"
                 f"🛠️  提示词附加要求: {prompt_guidelines}\n\n"
                 f"📢  详细输出模式: {'开启' if verbose else '关闭'}\n\n"
@@ -535,7 +535,7 @@ class SDGenerator(Star):
             logger.error(f"获取生成参数失败: {e}")
             yield event.plain_result("❌ 获取图像生成参数失败，请检查配置是否正确")
 
-    @sd.command("help")
+    @sd.command("help") # 帮助指令
     async def show_help(self, event: AstrMessageEvent):
         """显示SDGenerator插件所有可用指令及其描述"""
         help_msg = [
@@ -578,7 +578,7 @@ class SDGenerator(Star):
         ]
         yield event.plain_result("\n".join(help_msg))
 
-    @sd.command("res")
+    @sd.command("res") # 设置生成图像的宽和高
     async def set_resolution(self, event: AstrMessageEvent, width: int,height: int ):
         """设置分辨率"""
         try:
@@ -595,7 +595,7 @@ class SDGenerator(Star):
             logger.error(f"设置分辨率失败: {e}")
             yield event.plain_result("❌ 设置分辨率失败，请检查日志")
 
-    @sd.command("step")
+    @sd.command("step")# 设置生成图像的步数
     async def set_step(self, event: AstrMessageEvent, step: int):
         """设置步数"""
         try:
@@ -611,7 +611,7 @@ class SDGenerator(Star):
             logger.error(f"设置步数失败: {e}")
             yield event.plain_result("❌ 设置步数失败，请检查日志")
 
-    @sd.command("batch")
+    @sd.command("batch") # 设置一次性生成的图片数量
     async def set_batch_size(self, event: AstrMessageEvent, batch_size: int):
         """设置批量生成的图片数量"""
         try:
@@ -627,7 +627,7 @@ class SDGenerator(Star):
             logger.error(f"设置批量生成数量失败: {e}")
             yield event.plain_result("❌ 设置图片生成批数量失败，请检查日志")
 
-    @sd.command("iter")
+    @sd.command("iter") # 设置生成图像的迭代次数
     async def set_n_iter(self, event: AstrMessageEvent, n_iter: int):
         """设置生成迭代次数"""
         try:
@@ -643,11 +643,11 @@ class SDGenerator(Star):
             logger.error(f"设置生成迭代次数失败: {e}")
             yield event.plain_result("❌ 设置图片生成的迭代次数失败，请检查日志")
 
-    @sd.group("model")
+    @sd.group("model") #引出模型设置子命令
     def model(self):
         pass
 
-    @model.command("list")
+    @model.command("list") # 列出可用的生图模型
     async def list_model(self, event: AstrMessageEvent):
         """
         以“1. xxx.safetensors“形式打印可用的模型
@@ -665,7 +665,7 @@ class SDGenerator(Star):
             logger.error(f"获取模型列表失败: {e}")
             yield event.plain_result("❌ 获取模型列表失败，请检查 WebUI 是否运行")
 
-    @model.command("set")
+    @model.command("set") # 设置使用哪个生图模型
     async def set_base_model(self, event: AstrMessageEvent, model_index: int):
         """
         解析用户输入的索引，并设置对应的模型
@@ -696,7 +696,7 @@ class SDGenerator(Star):
             logger.error(f"切换模型失败: {e}")
             yield event.plain_result("❌ 切换模型失败，请检查日志")
 
-    @sd.command("lora")
+    @sd.command("lora") # 列出可用的 LoRA 模型
     async def list_lora(self, event: AstrMessageEvent):
         """
         列出可用的 LoRA 模型
@@ -711,11 +711,11 @@ class SDGenerator(Star):
         except Exception as e:
             yield event.plain_result(f"获取 LoRA 模型列表失败: {str(e)}")
 
-    @sd.group("sampler")
+    @sd.group("sampler") # 引出采样器设置子命令
     def sampler(self):
         pass
 
-    @sampler.command("list")
+    @sampler.command("list") # 列出可用的采样器
     async def list_sampler(self, event: AstrMessageEvent):
         """
         列出所有可用的采样器
@@ -731,7 +731,7 @@ class SDGenerator(Star):
         except Exception as e:
             yield event.plain_result(f"获取采样器列表失败: {str(e)}")
 
-    @sampler.command("set")
+    @sampler.command("set") # 设置采样器
     async def set_sampler(self, event: AstrMessageEvent, sampler_index: int):
         """
         设置采样器
@@ -758,7 +758,7 @@ class SDGenerator(Star):
         except Exception as e:
             yield event.plain_result(f"设置采样器失败: {str(e)}")
 
-    @sd.group("upscaler")
+    @sd.group("upscaler") # 引出上采样算法设置子命令
     def upscaler(self):
         pass
 
@@ -778,7 +778,7 @@ class SDGenerator(Star):
         except Exception as e:
             yield event.plain_result(f"获取上采样算法列表失败: {str(e)}")
 
-    @upscaler.command("set")
+    @upscaler.command("set") # 设置上采样算法
     async def set_upscaler(self, event: AstrMessageEvent, upscaler_index: int):
         """
         设置上采样算法
@@ -806,7 +806,7 @@ class SDGenerator(Star):
             yield event.plain_result(f"设置上采样算法失败: {str(e)}")
 
 
-    @sd.command("embedding")
+    @sd.command("embedding") # 列出可用的 Embedding 模型
     async def list_embedding(self, event: AstrMessageEvent):
         """
         列出可用的 Embedding 模型
@@ -821,7 +821,7 @@ class SDGenerator(Star):
         except Exception as e:
             yield event.plain_result(f"获取 Embedding 模型列表失败: {str(e)}")
 
-    @llm_tool("generate_image")
+    @llm_tool("generate_image") # LLM可调用的图像生成工具函数
     async def generate_image(self, event: AstrMessageEvent, prompt: str):
         """Generate images using Stable Diffusion based on the given prompt.
         This function should only be called when the prompt contains keywords like "generate," "draw," or "create."
