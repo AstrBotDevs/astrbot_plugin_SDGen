@@ -449,7 +449,7 @@ class SDGenerator(Star):
             yield event.plain_result("❌ 切换生成提示词功能失败，请检查日志")
 
     @sd.command("headtail")
-    async def set_generate_prompt(self, event: AstrMessageEvent):
+    async def set_positive_prompt_add_in_head_or_tail(self, event: AstrMessageEvent):
         """切换全局正向提示词添加位置"""
         try:
             current_setting = self.config.get("enable_positive_prompt_add_in_head_or_tail", False)
