@@ -64,7 +64,7 @@
 
     "prompt_group": {
         "type": "object",
-        "description": "提示词组合",
+        "description": "正负提示词预设组合",
         "items": {
             "positive_prompt_group": {
             "type": "object",

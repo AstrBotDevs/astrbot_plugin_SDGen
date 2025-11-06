@@ -300,23 +300,26 @@ class SDGenerator(Star):
                 if verbose:
                     yield event.plain_result("🖌️ 生成图像阶段，这可能需要一段时间...")
 
-                # 生成提示词
+                # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
+
+                positive_prompt_global = self.config.get("positive_prompt_global", "")  # 获取全局正向提示词
+                enable_positive_prompt_add_in_head_or_tail = self.config.get("enable_positive_prompt_add_in_head_or_tail",True) # 获取正面提示词添加位置
+
                 
-                if self.config.get("enable_generate_prompt"):
+                if self.config.get("enable_generate_prompt"):   # 检查是否启用用LLM生成提示词
                     generated_prompt = await self._generate_prompt(prompt)
                     logger.debug(f"LLM generated prompt: {generated_prompt}")
-                    enable_positive_prompt_add_in_head_or_tail = self.config.get("enable_positive_prompt_add_in_head_or_tail",True)
                     if enable_positive_prompt_add_in_head_or_tail:
-                        positive_prompt = self.config.get("positive_prompt_global", "") + generated_prompt
+                        positive_prompt = positive_prompt_global + generated_prompt
                     
                     else:
-                        positive_prompt = generated_prompt + self.config.get("positive_prompt_global", "")
-                else:
-                    enable_positive_prompt_add_in_head_or_tail = self.config.get("enable_positive_prompt_add_in_head_or_tail",True)
+                        positive_prompt = generated_prompt + positive_prompt_global
+                else:   
+                # 使用用户提供的提示词    
                     if enable_positive_prompt_add_in_head_or_tail:
-                        positive_prompt = self.config.get("positive_prompt_global", "") + self._trans_prompt(prompt)
+                        positive_prompt = positive_prompt_global + self._trans_prompt(prompt)
                     else:
-                        positive_prompt = self._trans_prompt(prompt) + self.config.get("positive_prompt_global", "")
+                        positive_prompt = self._trans_prompt(prompt) + positive_prompt_global
                     
 
                 #输出正向提示词
