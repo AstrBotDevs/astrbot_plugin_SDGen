@@ -75,7 +75,7 @@
                 "hint": "会自动附加到所有AI生图请求的提示词词组中"
             },    
 
-            "global_nagative_prompt_switch": {
+            "global_negative_prompt_switch": {
                 "type": "bool",
                 "description": "全局负面提示词开关",
                 "default": false,

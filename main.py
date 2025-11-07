@@ -101,9 +101,14 @@ class SDGenerator(Star):
         """构建生成参数"""
         params = self.config["default_params"]
 
+        if global_negative_prompt_switch:
+             global_negative_prompt = self.config.get("global_prompt_group").get("global_negative_prompt", "")
+        else:
+             global_negative_prompt = ""
+
         return {
             "prompt": prompt,
-            "negative_prompt": self.config.get("global_prompt_group").get("global_negative_prompt", ""),
+            "negative_prompt": global_negative_prompt,
             "width": params["width"],
             "height": params["height"],
             "steps": params["steps"],
@@ -228,8 +233,10 @@ class SDGenerator(Star):
 
     def _get_generation_params(self) -> str:
         """获取当前图像生成的参数"""
-        global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")
-        global_negative_prompt = self.config.get("global_prompt_group").get("global_negative_prompt", "")
+        global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正向提示词开关状态
+        global_negative_prompt_switch = self.config.get("global_prompt_group").get("global_negative_prompt_switch", False)  # 获取全局负面提示词开关状态
+        global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "") # 获取全局正向提示词
+        global_negative_prompt = self.config.get("global_prompt_group").get("global_negative_prompt", "")   #获取全局负面提示词
 
         params = self.config.get("default_params", {})
         width = params.get("width") or "未设置"
@@ -243,7 +250,9 @@ class SDGenerator(Star):
         base_model = self.config.get("base_model").strip() or "未设置"
 
         return (
+            f"- 全局正向提示词开关: {'开启' if global_positive_prompt_switch else '关闭'}\n"
             f"- 全局正面提示词: {global_positive_prompt}\n"
+            f"- 全局负面提示词开关: {'开启' if global_negative_prompt_switch else '关闭'}\n"
             f"- 全局负面提示词: {global_negative_prompt}\n"
             f"- 基础模型: {base_model}\n"
             f"- 图片尺寸: {width}x{height}\n"
@@ -302,13 +311,18 @@ class SDGenerator(Star):
 
                 # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
 
-                global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")  # 获取全局正向提示词
+                if global_positive_prompt_switch:
+                    global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")   #判断是否启用全局正向提示词，并获得全局正向提示词
+                else:
+                    global_positive_prompt = ""
+                    
                 positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get("positive_prompt_add_in_head_or_tail_switch",True) # 获取正面提示词添加位置
-
+                    
                 
                 if self.config.get("enable_generate_prompt"):   # 检查是否启用用LLM生成提示词
                     generated_prompt = await self._generate_prompt(prompt)
                     logger.debug(f"LLM generated prompt: {generated_prompt}")
+                    
                     if positive_prompt_add_in_head_or_tail_switch:
                         positive_prompt = global_positive_prompt + generated_prompt
                     
@@ -498,6 +512,9 @@ class SDGenerator(Star):
     async def show_conf(self, event: AstrMessageEvent):
         """打印当前图像生成参数，包括当前使用的模型"""
         try:
+            global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正向提示词开关状态
+            global_negative_prompt_switch = self.config.get("global_prompt_group").get("global_negative_prompt_switch", False)  # 获取全局负面提示词开关状态
+
             user_positive_prompt1 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt1"] # 获取正向提示词组1
             user_positive_prompt2 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt2"] # 获取正向提示词组2
             user_positive_prompt3 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt3"] # 获取正向提示词组3
@@ -516,12 +533,12 @@ class SDGenerator(Star):
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
                 f"Test：全局正面提示词加在 {'头部' if positive_prompt_add_in_head_or_tail_switch else '尾部'}\n\n"
-                f"Test：正面提示词组1:{user_positive_prompt1}\n\n"
-                f"Test：正面提示词组2:{user_positive_prompt2}\n\n"
-                f"Test：正面提示词组3:{user_positive_prompt3}\n\n"
-                f"Test：负面提示词组1:{user_negative_prompt1}\n\n"
-                f"Test：负面提示词组2:{user_negative_prompt2}\n\n"
-                f"Test：负面提示词组3:{user_negative_prompt3}\n\n"
+                f"Test：用户预设正面提示词组1:{user_positive_prompt1}\n\n"
+                f"Test：用户预设正面提示词组2:{user_positive_prompt2}\n\n"
+                f"Test：用户预设正面提示词组3:{user_positive_prompt3}\n\n"
+                f"Test：用户预设负面提示词组1:{user_negative_prompt1}\n\n"
+                f"Test：用户预设负面提示词组2:{user_negative_prompt2}\n\n"
+                f"Test：用户预设负面提示词组3:{user_negative_prompt3}\n\n"
                 f"🔍  图像增强参数:\n{scale_params}\n\n"
                 f"🛠️  提示词附加要求: {prompt_guidelines}\n\n"
                 f"📢  详细输出模式: {'开启' if verbose else '关闭'}\n\n"
