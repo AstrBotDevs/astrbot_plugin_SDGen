@@ -101,6 +101,8 @@ class SDGenerator(Star):
         """构建生成参数"""
         params = self.config["default_params"]
 
+        global_negative_prompt_switch = self.config.get("global_prompt_group").get("global_negative_prompt_switch", False)  # 获取全局负面提示词开关状态
+
         if global_negative_prompt_switch:
              global_negative_prompt = self.config.get("global_prompt_group").get("global_negative_prompt", "")
         else:
