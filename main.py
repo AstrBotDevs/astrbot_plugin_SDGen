@@ -311,6 +311,8 @@ class SDGenerator(Star):
 
                 # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
 
+                global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正向提示词开关状态
+
                 if global_positive_prompt_switch:
                     global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")   #判断是否启用全局正向提示词，并获得全局正向提示词
                 else:
