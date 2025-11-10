@@ -29,9 +29,9 @@
 
     "enable_generate_prompt": {
         "type": "bool",
-        "description": "启用使用LLM生成正向提示词",
+        "description": "启用使用LLM生成正面提示词",
         "default": true,
-        "hint": "设置为true时启用，开启时，当使用sd gen XXXX指令时，将XXXX先发送给LLM，再由LLM来生成正向提示词；关闭时，XXXX内容将直接作为提示词送入Stable diffusion"
+        "hint": "设置为true时启用，开启时，当使用sd gen XXXX指令时，将XXXX先发送给LLM，再由LLM来生成正面提示词；关闭时，XXXX内容将直接作为提示词送入Stable diffusion"
     },
 
     "enable_upscale": {
@@ -43,9 +43,9 @@
 
     "enable_show_positive_prompt": {
         "type": "bool",
-        "description": "启用输出正向提示词",
+        "description": "启用输出正面提示词",
         "default": false,
-        "hint": "设置为true时启用，开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正向提示词"
+        "hint": "设置为true时启用，开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正面提示词"
     },
 
     "global_prompt_group": {
@@ -56,9 +56,9 @@
 
             "global_positive_prompt_switch": {
                 "type": "bool",
-                "description": "全局正向提示词开关",
+                "description": "全局正面提示词开关",
                 "default": false,
-                "hint": "决定是否启用全局正向提示词"
+                "hint": "决定是否启用全局正面提示词"
             },    
 
             "positive_prompt_add_in_head_or_tail_switch": {
@@ -70,7 +70,7 @@
 
             "global_positive_prompt": {
                 "type": "string",
-                "description": "全局正向提示词",
+                "description": "全局正面提示词",
                 "default": "",
                 "hint": "会自动附加到所有AI生图请求的提示词词组中"
             },    
@@ -86,7 +86,7 @@
                 "type": "string",
                 "description": "全局负面提示词",
                 "default": "",
-                "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
+                "hint": "用户只能在QQ等操作界面中只能输入正面提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
             }
         }
     },
@@ -101,6 +101,21 @@
             "description": "用户预设正面提示词组合",
             "hint": "会自动附加到所有AI生图请求的提示词词组中，默认使用的正面提示词为1号。",
             "items":{
+
+                "user_positive_prompt_list":{
+                    "type": "list",
+                    "description": "用户预设正面提示词列表",
+                    "hint": "供用户选择使用的预设正面提示词",
+                    "options": [0,1,2,3],
+                    "default": 0
+                },
+
+                "user_positive_prompt0": {
+                    "type": "string",
+                    "description": "用户预设正面提示词0",
+                    "hint": "可以留空，以满足用户不想使用预设正面提示词的需求", 
+                    "default": ""
+                },
 
                 "user_positive_prompt1": {
                     "type": "string",
@@ -128,8 +143,23 @@
             "user_negative_prompt_group": {
              "type": "object",
              "description": "用户预设提示词组合",
-             "hint": "用户只能在QQ等操作界面中只能输入正向提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例，默认使用的负面提示词为1号。",
+             "hint": "用户只能在QQ等操作界面中只能输入正面提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例，默认使用的负面提示词为1号。",
              "items": {
+
+                "user_nagative_prompt_list":{
+                    "type": "list",
+                    "description": "用户预设负面提示词列表",
+                    "hint": "供用户选择使用的预设负面提示词",
+                    "options": [0,1,2,3],
+                    "default": 0
+                },
+
+                "user_negative_prompt0": {
+                    "type": "string",
+                    "description": "用户预设负面提示词0",
+                    "hint": "可以留空，以满足用户不想使用预设负面提示词的需求",
+                    "default": ""
+                },
 
                 "user_negative_prompt1": {
                     "type": "string",

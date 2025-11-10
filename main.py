@@ -235,9 +235,9 @@ class SDGenerator(Star):
 
     def _get_generation_params(self) -> str:
         """获取当前图像生成的参数"""
-        global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正向提示词开关状态
+        global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正面提示词开关状态
         global_negative_prompt_switch = self.config.get("global_prompt_group").get("global_negative_prompt_switch", False)  # 获取全局负面提示词开关状态
-        global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "") # 获取全局正向提示词
+        global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "") # 获取全局正面提示词
         global_negative_prompt = self.config.get("global_prompt_group").get("global_negative_prompt", "")   #获取全局负面提示词
 
         params = self.config.get("default_params", {})
@@ -252,7 +252,7 @@ class SDGenerator(Star):
         base_model = self.config.get("base_model").strip() or "未设置"
 
         return (
-            f"- 全局正向提示词开关: {'开启' if global_positive_prompt_switch else '关闭'}\n"
+            f"- 全局正面提示词开关: {'开启' if global_positive_prompt_switch else '关闭'}\n"
             f"- 全局正面提示词: {global_positive_prompt}\n"
             f"- 全局负面提示词开关: {'开启' if global_negative_prompt_switch else '关闭'}\n"
             f"- 全局负面提示词: {global_negative_prompt}\n"
@@ -313,10 +313,10 @@ class SDGenerator(Star):
 
                 # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
 
-                global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正向提示词开关状态
+                global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正面提示词开关状态
 
                 if global_positive_prompt_switch:
-                    global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")   #判断是否启用全局正向提示词，并获得全局正向提示词
+                    global_positive_prompt = self.config.get("global_prompt_group").get("global_positive_prompt", "")   #判断是否启用全局正面提示词，并获得全局正面提示词
                 else:
                     global_positive_prompt = ""
                     
@@ -340,9 +340,9 @@ class SDGenerator(Star):
                         positive_prompt = self._trans_prompt(prompt) + global_positive_prompt
                     
 
-                #输出正向提示词
+                #输出正面提示词
                 if self.config.get("enable_show_positive_prompt", False):
-                    yield event.plain_result(f"正向提示词：{positive_prompt}")
+                    yield event.plain_result(f"正面提示词：{positive_prompt}")
 
                 # 生成图像
                 response = await self._call_t2i_api(positive_prompt)
@@ -466,9 +466,9 @@ class SDGenerator(Star):
             logger.error(f"切换生成提示词功能失败: {e}")
             yield event.plain_result("❌ 切换生成提示词功能失败，请检查日志")
 
-    @sd.command("headtail") # 切换全局正向提示词添加位置
+    @sd.command("headtail") # 切换全局正面提示词添加位置
     async def switch_positive_prompt_add_in_head_or_tail(self, event: AstrMessageEvent):
-        """切换全局正向提示词添加位置"""
+        """切换全局正面提示词添加位置"""
         try:
             current_setting = self.config.get("global_prompt_group").get("positive_prompt_add_in_head_or_tail_switch", False)
             new_setting = not current_setting
@@ -481,9 +481,9 @@ class SDGenerator(Star):
             logger.error(f"切换全局正面提示词位置失败: {e}")
             yield event.plain_result("❌ 切换全局正面提示词位置失败，请检查日志")
 
-    @sd.command("prompt") # 切换显示正向提示词功能
+    @sd.command("prompt") # 切换显示正面提示词功能
     async def set_show_prompt(self, event: AstrMessageEvent):
-        """切换显示正向提示词功能"""
+        """切换显示正面提示词功能"""
         try:
             current_setting = self.config.get("enable_show_positive_prompt", False)
             new_setting = not current_setting
@@ -491,10 +491,10 @@ class SDGenerator(Star):
             self.config.save_config()
 
             status = "开启" if new_setting else "关闭"
-            yield event.plain_result(f"📢 显示正向提示词功能已{status}")
+            yield event.plain_result(f"📢 显示正面提示词功能已{status}")
         except Exception as e:
-            logger.error(f"切换显示正向提示词功能失败: {e}")
-            yield event.plain_result("❌ 切换显示正向提示词功能失败，请检查日志")
+            logger.error(f"切换显示正面提示词功能失败: {e}")
+            yield event.plain_result("❌ 切换显示正面提示词功能失败，请检查日志")
 
     @sd.command("timeout")  # 设置会话超时时间
     async def set_timeout(self, event: AstrMessageEvent, time: int):
@@ -516,12 +516,12 @@ class SDGenerator(Star):
     async def show_conf(self, event: AstrMessageEvent):
         """打印当前图像生成参数，包括当前使用的模型"""
         try:
-            global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正向提示词开关状态
+            global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正面提示词开关状态
             global_negative_prompt_switch = self.config.get("global_prompt_group").get("global_negative_prompt_switch", False)  # 获取全局负面提示词开关状态
 
-            user_positive_prompt1 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt1"] # 获取正向提示词组1
-            user_positive_prompt2 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt2"] # 获取正向提示词组2
-            user_positive_prompt3 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt3"] # 获取正向提示词组3
+            user_positive_prompt1 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt1"] # 获取正面提示词组1
+            user_positive_prompt2 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt2"] # 获取正面提示词组2
+            user_positive_prompt3 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt3"] # 获取正面提示词组3
             user_negative_prompt1 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt1"] # 获取负面提示词组1
             user_negative_prompt2 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt2"] # 获取负面提示词组2
             user_negative_prompt3 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt3"] # 获取负面提示词组3
@@ -531,7 +531,7 @@ class SDGenerator(Star):
             positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get('positive_prompt_add_in_head_or_tail_switch',True) # 获取全局正面提示词添加位置
             verbose = self.config.get("verbose", True)  # 获取详略模式
             upscale = self.config.get("enable_upscale", False)  # 图像增强模式
-            show_positive_prompt = self.config.get("enable_show_positive_prompt", False)  # 是否显示正向提示词
+            show_positive_prompt = self.config.get("enable_show_positive_prompt", False)  # 是否显示正面提示词
             generate_prompt = self.config.get("enable_generate_prompt", False)  # 是否启用生成提示词
 
             conf_message = (
@@ -547,7 +547,7 @@ class SDGenerator(Star):
                 f"🛠️  提示词附加要求: {prompt_guidelines}\n\n"
                 f"📢  详细输出模式: {'开启' if verbose else '关闭'}\n\n"
                 f"🔧  图像增强模式: {'开启' if upscale else '关闭'}\n\n"
-                f"📝  正向提示词显示: {'开启' if show_positive_prompt else '关闭'}\n\n"
+                f"📝  正面提示词显示: {'开启' if show_positive_prompt else '关闭'}\n\n"
                 f"🤖  提示词生成模式: {'开启' if generate_prompt else '关闭'}"
             )
 
@@ -572,8 +572,8 @@ class SDGenerator(Star):
             "🔧 **高级功能指令**:",
             "- `/sd verbose`：切换详细输出模式，用于实时告知目前AI生图进行到了哪个阶段。",
             "- `/sd upscale`：切换图像增强模式（用于超分辨率放大或高分修复）。",
-            "- `/sd LLM`：在使用/sd gen指令时，将内容先发送给LLM，再由LLM来生成正向提示词",
-            "- `/sd prompt`：开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正向提示词",
+            "- `/sd LLM`：在使用/sd gen指令时，将内容先发送给LLM，再由LLM来生成正面提示词",
+            "- `/sd prompt`：开启时，用户发起AI生图请求后，将发送一条消息，内容为送入到Stable diffusion的正面提示词",
             "- `/sd timeout [秒数]`：设置连接超时时间（建议范围：10 到 1800 秒）。",
             "- `/sd res  [宽度] [高度]`：设置图像生成的分辨率（高度和宽度均支持:1-2048之间的任意整数）。",
             "- `/sd step [步数]`：设置图像生成的步数（范围：10 到 50 步）。",
