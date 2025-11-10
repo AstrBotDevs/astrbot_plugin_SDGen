@@ -103,8 +103,8 @@
             "items":{
 
                 "user_positive_prompt_list":{
-                    "type": "list",
-                    "description": "用户预设正面提示词列表",
+                    "type": "int",
+                    "description": "生效的用户预设正面提示词编号",
                     "hint": "供用户选择使用的预设正面提示词",
                     "options": [0,1,2,3],
                     "default": 0
@@ -147,8 +147,8 @@
              "items": {
 
                 "user_nagative_prompt_list":{
-                    "type": "list",
-                    "description": "用户预设负面提示词列表",
+                    "type": "int",
+                    "description": "生效的用户预设负面提示词编号",
                     "hint": "供用户选择使用的预设负面提示词",
                     "options": [0,1,2,3],
                     "default": 0
