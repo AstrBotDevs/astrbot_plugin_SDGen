@@ -512,7 +512,7 @@ class SDGenerator(Star):
             logger.error(f"设置用户正面提示词失败: {e}")
             yield event.plain_result("❌ 设置用户预设正面提示词失败，请检查日志")
 
-    @sd.command("nprompt")  # 设置生效的用户预设正面提示词
+    @sd.command("nprompt")  # 设置生效的用户预设负面提示词
     async def set_user_negative_prompt(self, event: AstrMessageEvent, nprompt: int):
         """设置生效的用户预设负面提示词"""
         try:

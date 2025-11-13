@@ -146,7 +146,7 @@
              "hint": "用户只能在QQ等操作界面中只能输入正面提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例，默认使用的负面提示词为1号。",
              "items": {
 
-                "user_nagative_prompt_list":{
+                "user_negative_prompt_list":{
                     "type": "int",
                     "description": "生效的用户预设负面提示词编号",
                     "hint": "供用户选择使用的预设负面提示词",
