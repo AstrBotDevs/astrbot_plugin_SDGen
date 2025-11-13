@@ -496,6 +496,39 @@ class SDGenerator(Star):
             logger.error(f"切换显示正面提示词功能失败: {e}")
             yield event.plain_result("❌ 切换显示正面提示词功能失败，请检查日志")
 
+    @sd.command("pprompt")  # 设置生效的用户预设正面提示词
+    async def set_user_positive_prompt(self, event: AstrMessageEvent, pprompt: int):
+        """设置生效的用户预设正面提示词"""
+        try:
+            if pprompt not in [0, 1, 2, 3]:
+                yield event.plain_result("⚠️ 可选择的用户正面提示词序号仅有 0、1、2、3")
+                return
+
+            self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt_list"] = pprompt
+            self.config.save_config()
+
+            yield event.plain_result(f"➕ 已经将生效的用户预设正面提示词设置{pprompt}号")
+        except Exception as e:
+            logger.error(f"设置用户正面提示词失败: {e}")
+            yield event.plain_result("❌ 设置用户预设正面提示词失败，请检查日志")
+
+    @sd.command("nprompt")  # 设置生效的用户预设正面提示词
+    async def set_user_negative_prompt(self, event: AstrMessageEvent, nprompt: int):
+        """设置生效的用户预设负面提示词"""
+        try:
+            if nprompt not in [0, 1, 2, 3]:
+                yield event.plain_result("⚠️ 可选择的用户负面提示词序号仅有 0、1、2、3")
+                return
+
+            self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt_list"] = pprompt
+            self.config.save_config()
+
+            yield event.plain_result(f"➕ 已经将生效的用户预设正面提示词设置{nprompt}号")
+        except Exception as e:
+            logger.error(f"设置用户负面提示词失败: {e}")
+            yield event.plain_result("❌ 设置用户预设负面提示词失败，请检查日志")
+
+
     @sd.command("timeout")  # 设置会话超时时间
     async def set_timeout(self, event: AstrMessageEvent, time: int):
         """设置会话超时时间"""
