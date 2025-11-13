@@ -520,10 +520,10 @@ class SDGenerator(Star):
                 yield event.plain_result("⚠️ 可选择的用户负面提示词序号仅有 0、1、2、3")
                 return
 
-            self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt_list"] = pprompt
+            self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt_list"] = nprompt
             self.config.save_config()
 
-            yield event.plain_result(f"➕ 已经将生效的用户预设正面提示词设置{nprompt}号")
+            yield event.plain_result(f"➖ 已经将生效的用户预设负面提示词设置{nprompt}号")
         except Exception as e:
             logger.error(f"设置用户负面提示词失败: {e}")
             yield event.plain_result("❌ 设置用户预设负面提示词失败，请检查日志")
