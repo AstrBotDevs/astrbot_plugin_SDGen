@@ -264,9 +264,9 @@ class SDGenerator(Star):
         base_model = self.config.get("base_model").strip() or "未设置"
 
         return (
-            f"- 全局正面提示词开关: {'开启' if global_positive_prompt_switch else '关闭'}\n"
+            f"- 全局正面提示词: {'开启' if global_positive_prompt_switch else '关闭'}\n"
             f"- 全局正面提示词: {global_positive_prompt}\n"
-            f"- 全局负面提示词开关: {'开启' if global_negative_prompt_switch else '关闭'}\n"
+            f"- 全局负面提示词: {'开启' if global_negative_prompt_switch else '关闭'}\n"
             f"- 全局负面提示词: {global_negative_prompt}\n"
             f"- 基础模型: {base_model}\n"
             f"- 图片尺寸: {width}x{height}\n"
@@ -581,7 +581,7 @@ class SDGenerator(Star):
             user_positive_prompt1 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt1"] # 获取正面提示词组1
             user_positive_prompt2 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt2"] # 获取正面提示词组2
             user_positive_prompt3 = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt3"] # 获取正面提示词组3
-            user_negative_prompt0 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt1"] # 获取负面提示词组0
+            user_negative_prompt0 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt0"] # 获取负面提示词组0
             user_negative_prompt1 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt1"] # 获取负面提示词组1
             user_negative_prompt2 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt2"] # 获取负面提示词组2
             user_negative_prompt3 = self.config["user_prompt_group"]["user_negative_prompt_group"]["user_negative_prompt3"] # 获取负面提示词组3
@@ -600,8 +600,6 @@ class SDGenerator(Star):
             conf_message = (
                 f"⚙️  图像生成参数:\n{gen_params}\n\n"
                 f"⬅️➡️  全局正面提示词加在 {'头部' if positive_prompt_add_in_head_or_tail_switch else '尾部'}\n\n"
-                f"🔘  全局正面提示词开关: {'开启' if global_positive_prompt_switch else '关闭'}\n"
-                f"🔘  全局负面提示词开关: {'开启' if global_negative_prompt_switch else '关闭'}\n\n"
                 f"➕  生效的用户预设正面提示词序号:{pprompt}\n"
                 f"➖  生效的用户预设负面提示词序号:{nprompt}\n\n"
                 f"➕0  用户预设正面提示词组0:{user_positive_prompt0}\n"
