@@ -17,7 +17,7 @@
         "type": "int",
         "description": "会话判定超时时间，单位秒（s）",
         "default": 120,
-        "hint": "默认为两分钟，根据需要修改。如果在这个时间内图片未能生成完毕，则终止本次请求，并发送提示消息。"
+        "hint": "默认为120 秒，根据需要修改。如果在这个时间内图片未能生成完毕，则终止本次请求，并发送提示消息。"
     },
 
     "max_concurrent_tasks": {
@@ -58,7 +58,7 @@
                 "type": "bool",
                 "description": "全局正面提示词开关",
                 "default": false,
-                "hint": "决定是否启用全局正面提示词"
+                "hint": "设置为true时启用，决定是否启用全局正面提示词"
             },    
 
             "positive_prompt_add_in_head_or_tail_switch": {
@@ -85,7 +85,7 @@
             "global_negative_prompt": {
                 "type": "string",
                 "description": "全局负面提示词",
-                "default": "",
+                "default": "(worst quality),(low quality:1.4),deformed,bad anatomy",
                 "hint": "用户只能在QQ等操作界面中只能输入正面提示词，无法输入负面提示词。所以请在这里设定全局负面提示词，它会自动附加到AI生图请求中，用于降低画面中特定的元素比例。"
             }
         }
@@ -175,7 +175,7 @@
 
                 "user_negative_prompt3": {
                     "type": "string",
-                    "description": "用户预设负面提示词2",
+                    "description": "用户预设负面提示词3",
                     "default": ""
                 }
 
