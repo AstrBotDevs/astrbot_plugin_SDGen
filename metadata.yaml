@@ -1,6 +1,6 @@
 name: astrbot_plugin_SDGen
 desc: 用于astrbot，使用Stable Diffusion WebUI的API进行图片生成的插件。
 help: 输入 /sd 查看关键词回复帮助。
-version: v1.1.2
+version: v1.2.0
 author: buding(AstrBot)
 repo: https://github.com/AstrBotDevs/astrbot_plugin_SDGen

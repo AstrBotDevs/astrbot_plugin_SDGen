@@ -31,7 +31,7 @@
         "type": "bool",
         "description": "启用使用LLM生成正面提示词",
         "default": true,
-        "hint": "设置为true时启用，开启时，当使用sd gen XXXX指令时，将XXXX先发送给LLM，再由LLM来生成正面提示词；关闭时，XXXX内容将直接作为提示词送入Stable diffusion"
+        "hint": "设置为true时启用，开启时，当使用sd gen [提示词]指令时，将[提示词]先发送给LLM，再由LLM来生成正面提示词；关闭时，[提示词]内容将直接作为提示词送入Stable diffusion"
     },
 
     "enable_upscale": {
