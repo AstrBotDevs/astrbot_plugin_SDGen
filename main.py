@@ -122,7 +122,7 @@ class SDGenerator(Star):
 
         return {
             "prompt": prompt,
-            "negative_prompt": global_negative_prompt + user_negative_prompt,
+            "negative_prompt": global_negative_prompt + "," + user_negative_prompt,
             "width": params["width"],
             "height": params["height"],
             "steps": params["steps"],
@@ -350,16 +350,16 @@ class SDGenerator(Star):
                     logger.debug(f"LLM generated prompt: {generated_prompt}")
                     
                     if positive_prompt_add_in_head_or_tail_switch: 
-                        positive_prompt = global_positive_prompt + user_positive_prompt + generated_prompt
+                        positive_prompt = global_positive_prompt + "," + user_positive_prompt + generated_prompt
                     
                     else:
-                        positive_prompt = generated_prompt + global_positive_prompt + user_positive_prompt
+                        positive_prompt = generated_prompt + "," + global_positive_prompt + "," + user_positive_prompt
                 else:   
                 # 使用用户提供的提示词    
                     if positive_prompt_add_in_head_or_tail_switch:
-                        positive_prompt = global_positive_prompt + user_positive_prompt + self._trans_prompt(prompt)
+                        positive_prompt = global_positive_prompt + "," + user_positive_prompt + "," + self._trans_prompt(prompt)
                     else:
-                        positive_prompt = self._trans_prompt(prompt) + global_positive_prompt + user_positive_prompt
+                        positive_prompt = self._trans_prompt(prompt) + "," + global_positive_prompt + "," + user_positive_prompt
                     
 
                 #输出正面提示词
@@ -639,7 +639,7 @@ class SDGenerator(Star):
             "➕➖ **正负提示词设置指令**:",
             "- `/sd headtail`：切换全局正面提示词添加位置（头部或尾部）。",
             "- `/sd pprompt`： 设置生效的用户预设正面提示词（0，1，2，3）。",
-            "- `/sd nprpmpt`： 设置生效的用户预设负面提示词（0，1，2，3）。",
+            "- `/sd nprompt`： 设置生效的用户预设负面提示词（0，1，2，3）。",
             "",
             "🔧 **高级功能指令**:",
             "- `/sd verbose`：切换详细输出模式，用于实时告知目前AI生图进行到了哪个阶段。",
