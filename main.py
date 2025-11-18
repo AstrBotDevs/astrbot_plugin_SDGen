@@ -326,7 +326,7 @@ class SDGenerator(Star):
                 # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
 
                 global_positive_prompt_switch = self.config.get("global_prompt_group").get("global_positive_prompt_switch", False)  # 获取全局正面提示词开关状态
-                positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get("positive_prompt_add_in_head_or_tail_switch",True) # 获取正面提示词添加位置
+                positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get("positive_prompt_add_in_head_or_tail_switch",False) # 获取正面提示词添加位置
                 pprompt = self.config["user_prompt_group"]["user_positive_prompt_group"]["user_positive_prompt_list"]  # 获取生效的用户预设正面提示词序号
 
                 if global_positive_prompt_switch:
@@ -590,7 +590,7 @@ class SDGenerator(Star):
             scale_params = self._get_upscale_params()   # 获取图像增强参数
             prompt_guidelines = self.config.get("prompt_guidelines").strip() or "未设置"  # 获取提示词限制
 
-            positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get('positive_prompt_add_in_head_or_tail_switch',True) # 获取全局正面提示词添加位置
+            positive_prompt_add_in_head_or_tail_switch = self.config.get("global_prompt_group").get('positive_prompt_add_in_head_or_tail_switch',False) # 获取全局正面提示词添加位置
 
             verbose = self.config.get("verbose", True)  # 获取详略模式
             upscale = self.config.get("enable_upscale", False)  # 图像增强模式
