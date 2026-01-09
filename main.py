@@ -351,16 +351,21 @@ class SDGenerator(Star):
             logger.error(f"❌ 检查可用性错误，报错{e}")
             yield event.plain_result("❌ 检查可用性错误，请检查日志")
 
-    @sd.command("gen")  # 生成图像指令
-    async def generate_image(self, event: AstrMessageEvent, prompt: str):
-        """生成图像指令
-        Args:
-            prompt: 图像描述提示词
-        """
+    async def _run_generate_image(
+        self,
+        event: AstrMessageEvent,
+        prompt: str,
+        allow_generate_prompt: bool,
+        allow_extract_prompt: bool
+    ):
+        """Shared image generation logic for command/tool callers."""
         async with self.task_semaphore:
             self.active_tasks += 1
             try:
-                prompt = self._extract_prompt_from_message(event, prompt)
+                if allow_extract_prompt:
+                    prompt = self._extract_prompt_from_message(event, prompt)
+                else:
+                    prompt = (prompt or "").strip()
                 if not prompt:
                     yield event.plain_result("⚠️ 需要提供提示词")
                     return
@@ -375,7 +380,7 @@ class SDGenerator(Star):
 
                 # 生成正面提示词，决定到底是使用LLM生成还是用户直接提供
                 generated_prompt = ""
-                if self.config.get("enable_generate_prompt"):
+                if allow_generate_prompt and self.config.get("enable_generate_prompt"):
                     generated_prompt = await self._generate_prompt(prompt)
                     logger.debug(f"LLM generated prompt: {generated_prompt}")
 
@@ -450,6 +455,20 @@ class SDGenerator(Star):
                 yield event.plain_result(f"❌ 图像生成失败: 发生其他错误，请检查日志")
             finally:
                 self.active_tasks -= 1
+
+    @sd.command("gen")  # 生成图像指令
+    async def generate_image(self, event: AstrMessageEvent, prompt: str):
+        """生成图像指令
+        Args:
+            prompt: 图像描述提示词
+        """
+        async for result in self._run_generate_image(
+            event,
+            prompt,
+            allow_generate_prompt=True,
+            allow_extract_prompt=True
+        ):
+            yield result
 
     @sd.command("verbose")  # 切换详细输出模式
     async def set_verbose(self, event: AstrMessageEvent):
@@ -938,13 +957,19 @@ class SDGenerator(Star):
         """Generate images using Stable Diffusion based on the given prompt.
         This function should only be called when the prompt contains keywords like "generate," "draw," or "create."
         It should not be mistakenly used for image searching.
+        The prompt should be ready for Stable Diffusion; no additional prompt generation is performed.
 
         Args:
             prompt (string): The prompt or description used for generating images.
         """
         try:
             # 使用 async for 遍历异步生成器的返回值
-            async for result in self.generate_image(event, prompt):
+            async for result in self._run_generate_image(
+                event,
+                prompt,
+                allow_generate_prompt=False,
+                allow_extract_prompt=False
+            ):
                 # 根据生成器的每一个结果返回响应
                 yield result
 
